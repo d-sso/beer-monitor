@@ -1,0 +1,27 @@
+# curl for setting active user
+curl -X PUT -H "accept: application/json" --url http://127.0.0.1:8000/user/active/3
+
+# curl for posting new beer
+curl -X POST -H "content-type: application/json" --url http://127.0.0.1:8000/addDrinkToActiveUser -d "{\"quantity\":0}"
+
+#uvicorn startup
+uvicorn main:app --reload --log-config=log_conf.yaml --host 0.0.0.0
+
+#set venv
+source venv/bin/activate
+
+sudo docker build -t fastapiimage .
+
+#run container & bind port 8000 to host to port 80 on container
+sudo docker run -d --name fastapicontainer -p 8000:80 fastapiimage
+
+
+# remove container & image
+sudo docker image rm fastapiimage
+sudo docker container rm fastapicontainer
+
+# restart container
+sudo docker restart fastapicontainer
+
+# stop container
+sudo docker container stop {Container-id}

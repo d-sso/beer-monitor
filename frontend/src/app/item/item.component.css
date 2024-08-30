@@ -1,0 +1,95 @@
+.item {
+    padding: 0.5rem 0.5rem 0.75rem 0.5rem;
+    text-align: left;
+    font-size: 1.2rem;
+    box-shadow:
+    0 2px 4px 0 rgb(0 0 0 / 20%),
+    0 2.5rem 5rem 0 rgb(0 0 0 / 10%);
+    margin-bottom: 0.2rem;
+    background-color: rgb(255, 255, 255);
+    /*border-style: outset;*/
+  }
+
+  .drinker-wrapper {
+    display: flex;
+    flex-wrap: wrap;
+    height: 30px;
+  }
+
+  .push-right {
+    align-self: right;
+    margin-left: auto;
+    margin-top: auto;
+    margin-bottom: auto;
+  }
+
+  .auto-margin{
+    margin-top: auto;
+    margin-bottom: auto;
+  }
+  
+  .btn-wrapper {
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+    display: flex;
+    justify-content: flex-start;
+  }
+  
+  .btn {
+    /* menu buttons flexbox styles */
+    font-size: 0.6rem;
+  }
+  
+  .btn-save {
+    background-color: #000;
+    color: #fff;
+    border-color: #000;
+  }
+  
+  .btn-save:hover {
+    background-color: #444242;
+  }
+  
+  .btn-save:focus {
+    background-color: #fff;
+    color: #000;
+  }
+  
+  .chechbox-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .checkbox-wrapper {
+    margin: 0.5rem 0;
+  }
+  
+  .btn-warn {
+    background-color: #ff8989;
+    color: #fff;
+    border-color: #ff8989;
+  }
+  
+  .btn-warn:hover {
+    background-color: #9a0000;
+  }
+  
+  .btn-warn:active {
+    background-color: #e30000;
+    border-color: #000;
+  }
+  
+  .sm-text-input {
+    width: 100%;
+    padding: 0.5rem;
+    border: 2px solid #555;
+    display: block;
+    box-sizing: border-box;
+    font-size: 1rem;
+    margin: 1rem 0;
+  }
+  
+  /* Custom checkboxes
+  Adapted from https://css-tricks.com/the-checkbox-hack/#custom-designed-radio-buttons-and-checkboxes */
+  

@@ -1,0 +1,34 @@
+<div class="item">
+    <div class="drinker-wrapper">
+      <!-- <div class="checkbox-container"> -->
+        <input
+          [id]="item.name"
+          type="radio"
+          name="active"
+          [value]="item.id"
+          [(checked)]="item.active"
+          (change)="handleChange($event)" />
+        <label [for]="item.name" class="auto-margin">{{item.name}}</label>
+      <!-- </div> -->
+      <div class="push-right"> {{getTotalDrink()}} L </div>
+    </div>
+    <div class="btn-wrapper" *ngIf="!editable">
+      <button class="btn" (click)="toggleEdit()">Edit</button>
+      <button class="btn btn-warn" (click)="remove.emit()">Delete</button>
+    </div>
+  
+    <!-- This section shows only if user clicks Edit button -->
+    <div *ngIf="editable">
+      <input
+        class="sm-text-input"
+        placeholder="edit item"
+        [value]="item.name"
+        #editedItem
+        (keyup.enter)="saveItem(editedItem.value)" />
+  
+      <div class="btn-wrapper">
+        <button class="btn" (click)="toggleEdit()">Cancel</button>
+        <button class="btn btn-save" (click)="saveItem(editedItem.value)">Save</button>
+      </div>
+    </div>
+  </div>

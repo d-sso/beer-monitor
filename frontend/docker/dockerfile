@@ -1,0 +1,15 @@
+FROM node:alpine AS build-step
+WORKDIR /code
+COPY package.json .
+COPY package-lock.json .
+RUN npm ci
+
+COPY . .
+RUN npm run build --prod
+
+FROM nginx:alpine
+COPY docker/nginx.conf /etc/nginx/conf.d/
+
+RUN rm -rf /usr/share/nginx/html/*
+
+COPY --from=build-step --chmod=765 /code/dist/beer-ranking/browser /usr/share/nginx/html
