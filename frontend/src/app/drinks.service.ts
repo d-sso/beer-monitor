@@ -11,7 +11,7 @@ export class DrinksService {
   constructor(private http: HttpClient) { }
 
   getDrinkers(): Observable<Drinker[]>{
-    return this.http.get<Drinker[]>('http://192.168.18.2:8000/users');
+    return this.http.get<Drinker[]>('http://ip:8000/users');
   }
 
   removeDrinker(person:Drinker){
@@ -19,10 +19,10 @@ export class DrinksService {
   }
 
   addDrinker(person:Drinker){
-    this.http.post('http://192.168.18.2:8000/adduser',person).subscribe(x => console.log(x));
+    this.http.post('http://ip:8000/adduser',person).subscribe(x => console.log(x));
   }
 
   setActive(id:number): Observable<any>{
-    return this.http.put(`http://192.168.18.2:8000/user/active/${id}`,null);
+    return this.http.put(`http://ip:8000/user/active/${id}`,null);
   }
 }
