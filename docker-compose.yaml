@@ -18,3 +18,9 @@ services:
       - api
     ports:
       - "8080:80"
+  mqtt-service:
+    container_name: mqtt-beer
+    restart: always
+    build:
+      context: "MQTT-service"
+      dockerfile: "Dockerfile"

@@ -7,4 +7,4 @@ Firmware:
 -ESPHome creating a NodeMCU image
 
 Other dependencies:
--MQTT broker - mosquito MQTT
+-MQTT broker - used mosquito MQTT on home assistant
