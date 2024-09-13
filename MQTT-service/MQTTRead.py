@@ -1,10 +1,11 @@
 import paho.mqtt.client as mqtt
 import requests
+import secrets
 
-TargetTopic = '/home/WiFi/DownloadSpeed'
-USERNAME = 'mqtt'
-PASSWORD = 'mqtt'
-api_url = 'http://ip:8000/addDrinkToActiveUser'
+TargetTopic = secrets.MQTT_info['target_topic']
+USERNAME = secrets.MQTT_info['username']
+PASSWORD = secrets.MQTT_info['password']
+api_url = secrets.MQTT_info['api_url']
 
 # The callback for when the client receives a CONNACK response from the server.
 def on_connect(client, userdata, flags, reason_code, properties):
@@ -26,7 +27,7 @@ mqttc.username_pw_set(USERNAME,PASSWORD)
 mqttc.on_connect = on_connect
 mqttc.on_message = on_message
 
-mqttc.connect("mqtt", 1883, 60)
+mqttc.connect(secrets.MQTT_info['mqtt_server'], 1883, 60)
 
 # Blocking call that processes network traffic, dispatches callbacks and
 # handles reconnecting.
