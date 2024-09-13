@@ -1,4 +1,4 @@
-import paho.mqtt.client as mqtt
+import paho.mqtt.client as mqtt # type: ignore
 import requests
 import secrets
 
