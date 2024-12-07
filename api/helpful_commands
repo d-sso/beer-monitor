@@ -7,8 +7,13 @@ curl -X POST -H "content-type: application/json" --url http://127.0.0.1:8000/add
 #uvicorn startup
 uvicorn main:app --reload --log-config=log_conf.yaml --host 0.0.0.0
 
-#set venv
+#create venv
+python -m venv venv
+
+#set venv (linux)
 source venv/bin/activate
+#set venv (windows)
+.\venv\Scrpits\activate
 
 sudo docker build -t fastapiimage .
 
