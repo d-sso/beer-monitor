@@ -35,3 +35,5 @@
 .Trashes
 ehthumbs.db
 Thumbs.db
+api/beer.db
+api/saved_encodings

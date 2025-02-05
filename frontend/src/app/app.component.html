@@ -1,10 +1,17 @@
 <style></style>
 
-<main class="main">
+<main class="main" style="min-width: 640px;">
   <div class="content">
     <h1>{{ componentTitle }}</h1>
+    <div id="camera-div" style="height: 480px; width: 640px; position:relative;text-align: left;">
+      <webcam style="position: absolute;" [trigger]="observableSnapshot" (imageCapture)="processCamSnapshot($event)" [captureImageData]="this.captureImageData"></webcam>
+      <canvas id="face-canvas" style="height:480px;width: 640px;position: absolute; z-index: 10;"></canvas>
+    </div>
     <h2> 
       How much we had today: {{totalQuantity()}} L
+    </h2>
+    <h2> 
+      Active user: {{getActiveUser()}}
     </h2>
 
     <ul>

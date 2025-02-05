@@ -4,3 +4,4 @@ sqlalchemy
 asyncio
 opencv-python
 numpy
+face_recognition

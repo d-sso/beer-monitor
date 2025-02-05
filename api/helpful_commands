@@ -20,7 +20,6 @@ sudo docker build -t fastapiimage .
 #run container & bind port 8000 to host to port 80 on container
 sudo docker run -d --name fastapicontainer -p 8000:80 fastapiimage
 
-
 # remove container & image
 sudo docker image rm fastapiimage
 sudo docker container rm fastapicontainer
@@ -30,3 +29,6 @@ sudo docker restart fastapicontainer
 
 # stop container
 sudo docker container stop {Container-id}
+
+# find port being listened to (windows)
+netstat -aon | findstr 8000
