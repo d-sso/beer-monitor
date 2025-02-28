@@ -22,7 +22,7 @@ from enum import Enum
 
 import base64
 
-import face_recognition_control
+import app.face_recognition_control as face_recognition_control
 
 ### TODO: refactor below portion into different file
 class AppModes(Enum):
@@ -53,7 +53,7 @@ Base.metadata.create_all(bind=engine)
 
 logger = logging.getLogger(__name__)
 #logger = logging.getLogger('uvicorn.error')
-face_recognition_controller = face_recognition_control(logger)
+face_recognition_controller = face_recognition_control.face_recognition_controller(logger)
 
 # Async context manager controls the start/shutdown - https://fastapi.tiangolo.com/advanced/events/
 @asynccontextmanager
@@ -216,7 +216,7 @@ async def detect(websocket: WebSocket, queue: asyncio.Queue, async_state: any, d
                     faces = face_recognition_controller.recognize_faces(img)
                     if async_state.app_mode == AppModes.DETECT:
                         # detect mode - do the face detection
-                        if len(faces) > 0:                           
+                        if len(faces['face_locations']) > 0:                           
                             # If there is just one identified user in the camera, set it as active
                             if len(faces["user_ids"]) == 1 and faces["user_ids"][0] != 0:
                                 try:
@@ -224,17 +224,16 @@ async def detect(websocket: WebSocket, queue: asyncio.Queue, async_state: any, d
                                 except Exception as e:
                                     logger.error(f"Error setting user as active - {e}")
 
-                            faces_output = Faces(faces=faces.tolist(),app_state=async_state,detected_face = (faces["user_ids"]))
+                            faces_output = Faces(faces=faces['face_locations'],app_state=async_state,detected_face = (faces["user_ids"]))
                         else:
                             faces_output = Faces(faces=[],app_state=async_state,detected_face=[])
                         await websocket.send_text(faces_output.model_dump_json())
 
                     elif async_state.app_mode == AppModes.CAPTURE:
-
                         ### TODO: move this logic to face_recognition_control.py
                         # program is in capture mode - do the capture & return to idle after
                         [img_height,img_width,n] = img.shape
-                        if len(faces) == 1:
+                        if len(faces['face_locations']) == 1:
                             #Ensure we have a centered face and it's a big enough image:
                             # Values returned for the Faces are {x, y, width, height}
                             [x,y,width,height] = faces[0]
@@ -254,7 +253,7 @@ async def detect(websocket: WebSocket, queue: asyncio.Queue, async_state: any, d
                                     # after capturing images, go to detect mode
                                     async_state.app_mode = AppModes.DETECT
                                     face_recognition_controller.save_images_on_buffer()
-                            faces_output = Faces(faces=faces.tolist(),app_state=async_state,detected_face=[])
+                            faces_output = Faces(faces=faces['face_locations'],app_state=async_state,detected_face=[])
                         else:
                             faces_output = Faces(faces=[],app_state=async_state,detected_face=[])
                         await websocket.send_text(faces_output.model_dump_json())

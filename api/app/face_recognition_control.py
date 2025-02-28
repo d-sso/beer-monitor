@@ -3,10 +3,14 @@ import cv2
 import pickle
 import os
 from pathlib import Path
-import util
+import app.util as util
 import numpy as np
 
-class face_recognition_control:
+def transform_coordinates(location):
+    [top,right,bottom,left] = location
+    return [left,bottom,(right-left),(top-bottom)]
+
+class face_recognition_controller:
     
     model_file_path = 'C:\\Users\\vihud\\OneDrive\\Documentos\\Projects\\PythonDev\\DetectFace\\saved_encodings'
     images_path = 'C:\\Users\\vihud\\OneDrive\\Documentos\\Projects\\PythonDev\\DetectFace\\imgs\\'
@@ -19,15 +23,12 @@ class face_recognition_control:
     ### TODO: how to pass logger to this class
     def __init__(self,logger):
         self.logger = logger
-        self.cascade_classifier = cv2.CascadeClassifier()
-        self.cascade_classifier.load(
-            cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
-        )
         self.load_model()
         self.buffer_images_to_save = list()
     
     def load_model(self):
         try:
+            #self.train_model()
             self.face_encodings = []
             self.user_ids = []
             with open(self.model_file_path,"rb") as saved_encodings:
@@ -36,7 +37,9 @@ class face_recognition_control:
                 self.user_ids = loaded_encodings['userId']
         except Exception as e:
             self.logger.error(f"Could not load model - {e}")
-    
+            self.logger.info(f"Trying to retrain")
+            self.train_model()
+
     def get_user_folder_path(self,user_id:str):
         """	
         This function creates a folder for the user if it does not exist and returns the path to the folder.	
@@ -159,7 +162,7 @@ class face_recognition_control:
                     user_id = self.user_ids[first_match_index]
                 user_ids.append(user_id)
             return {
-                    "face_locations": face_locations,
+                    "face_locations": [transform_coordinates(item) for item in face_locations],
                     "user_ids": user_ids
                 }
         except Exception as e:
@@ -167,24 +170,28 @@ class face_recognition_control:
             return {}
     
     def train_model(self):
-        folderPath = Path(self.images_path)
+        try:
+            folderPath = Path(self.images_path)
 
-        pathlist = [x for x in folderPath.iterdir() if x.is_dir()]
+            pathlist = [x for x in folderPath.iterdir() if x.is_dir()]
 
-        for path in pathlist:
-            encodings = []
-            userId = path.name
-            if util.is_number(userId):
-                for file in path.glob('**/*.png'):
-                    image = face_recognition.load_image_file(file)
-                    face_encoding = face_recognition.face_encodings(image)
-                    if len(face_encoding) > 0:
-                        self.face_encodings.append(encodings)
-                        self.user_ids.append(userId)
+            for path in pathlist:
+                encodings = []
+                userId = path.name
+                if util.is_number(userId):
+                    for file in path.glob('**/*.png'):
+                        image = face_recognition.load_image_file(file)
+                        face_encoding = face_recognition.face_encodings(image)
+                        if len(face_encoding) > 0:
+                            self.face_encodings.append(face_encoding[0])
+                            self.user_ids.append(userId)
 
-        model_dump = {
-            "encodings": self.face_encodings,
-            "userId": self.user_ids
-        }
-        with open(self.encodings_file_path,"wb") as fp:
-            pickle.dump(model_dump,fp)
+            model_dump = {
+                "encodings": self.face_encodings,
+                "userId": self.user_ids
+            }
+            with open(self.model_file_path,"wb") as fp:
+                pickle.dump(model_dump,fp)
+        except Exception as e:
+            self.logger.error(f"Could not train model - {e}")
+
