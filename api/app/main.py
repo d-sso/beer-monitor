@@ -5,10 +5,7 @@ import os
 from contextlib import asynccontextmanager
 import cv2
 import numpy as np
-import pickle
-import face_recognition
 
-from pathlib import Path
 from fastapi import FastAPI, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,6 +21,8 @@ from typing import List, Tuple
 from enum import Enum
 
 import base64
+
+import face_recognition_control
 
 ### TODO: refactor below portion into different file
 class AppModes(Enum):
@@ -50,18 +49,11 @@ class Faces(BaseModel):
     app_state: DetectApp
 
 ### END todo
+Base.metadata.create_all(bind=engine)
 
-### TODO: refactor below parameters into dedicated config file
-# by default store images on same folder
-basePath = 'C:/Users/vihud/OneDrive/Documentos/Projects/PythonDev/DetectFace/imgs/'
-# default name of the images
-baseName = 'img'
-encodings_file_path = 'C:\\Users\\vihud\\OneDrive\\Documentos\\Projects\\PythonDev\\DetectFace\\saved_encodings'
-all_encodings = []
-encoding_user_ids = []
-### END todo
-
-logger = logging.getLogger('uvicorn.error')
+logger = logging.getLogger(__name__)
+#logger = logging.getLogger('uvicorn.error')
+face_recognition_controller = face_recognition_control(logger)
 
 # Async context manager controls the start/shutdown - https://fastapi.tiangolo.com/advanced/events/
 @asynccontextmanager
@@ -70,27 +62,13 @@ async def lifespan(app: FastAPI):
     This tells fastapi to load the classifier upon app startup
     so that we don't have to wait for the classifier to be loaded after making a request
     """
-    cascade_classifier.load(
-        cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
-    )
-    try:
-        with open(encodings_file_path,"rb") as saved_encodings:
-            loaded_encodings = pickle.load(saved_encodings)
-            for encoding in loaded_encodings:
-                for item in encoding['encodings']:
-                    all_encodings.append(item)
-                    encoding_user_ids.append(encoding['userId'])
-    except Exception as e:
-        logger.error(f"Could not load model - {e}")
+    #try:
+    #    face_recognition_controller = face_recognition_control(logger)
+    #except Exception as e:
+    #    logger.error(f"Could not load model - {e}")
     yield
 
-Base.metadata.create_all(bind=engine)
-
-logger = logging.getLogger(__name__)
-
 app =FastAPI(lifespan=lifespan) # initialize FastAPI
-
-cascade_classifier = cv2.CascadeClassifier() 
 
 origins = ['*']
 
@@ -116,23 +94,19 @@ def get_db():
 
 @app.post("/adduser")
 async def add_user(request:UserSchema, db: Session = Depends(get_db)):
+    # check if user already exists
+    user = db.query(User).filter(User.name == request.name).first()
+    if user:
+        asyncState.app_mode = AppModes.DETECT
+        logger.info("User already exists")
+        return user
+    
     user = User(name = request.name, email = request.email, nickname = request.nickname)
     db.add(user)
     db.commit()
     db.refresh(user)
     asyncState.app_mode = AppModes.CAPTURE
     asyncState.user_id = user.id
-    target_path = basePath + str(asyncState.user_id)
-    try:
-        os.mkdir(target_path)
-    except FileExistsError:
-        print(f"Directory '{target_path}' already exists.")
-    except PermissionError:
-        print(f"Permission denied: Unable to create '{target_path}'.")
-        asyncState.app_mode = AppModes.DETECT
-    except Exception as e:
-        print(f"An error ocurred - can't capture images: {e}")
-        asyncState.app_mode = AppModes.DETECT
 
     return user
 
@@ -147,7 +121,7 @@ async def get_active_user(db: Session = Depends(get_db)):
     return user
 
 async def set_active_user(id,db: Session):
-    logger.info(id)
+    logger.info(f"Setting active user: {id}")
     user = db.query(User).get(int(id))
     if not user.active:
         currentActive = db.query(User).filter(User.active == True).first()
@@ -199,7 +173,7 @@ async def receive(websocket: WebSocket, queue: asyncio.Queue):
     This is the asynchronous function that will be used to receive webscoket 
     connections from the web page
     """
-    logger.info("Received")
+    logger.info("Received new image")
     base64img = await websocket.receive()
     try:
         base64img_split = base64img['text'].split(',')
@@ -218,84 +192,6 @@ async def receive(websocket: WebSocket, queue: asyncio.Queue):
             logger.info('Received bad image')
     except Exception as e:
         logger.error("Error parsing data received - " + e)
-
-async def write_image(filename,image):
-    cv2.imwrite(filename,image)
-
-async def add_image():
-    saved_images=saved_images+1
-
-def check_face_size(img_height,img_width,x,y,width,height):
-    """
-    This function checks if the detected face is centered and has a minimum size
-    """
-    return x > img_width*1.0/4 and \
-            y > img_height*1.0/6 and \
-            (x + width) < img_width*3.0/4 and \
-            (y + height) < img_height*5.0/6 and \
-            width > 100 and \
-            height > 150
-
-def is_number(s):
-    try:
-        int(s)
-        return True
-    except ValueError:
-        return False
-
-async def train_model():
-    folderPath = Path(basePath)
-
-    pathlist = [x for x in folderPath.iterdir() if x.is_dir()]
-    all_encodings = []
-    encoding_user_ids = []
-
-    saved_encodings = []
-
-    for path in pathlist:
-        encodings = []
-        userId = path.name
-        if is_number(userId):
-            for file in path.glob('**/*.png'):
-                with open(file,"rb") as tst:
-                    f = tst.read()
-                    img = np.asarray(bytearray(f))
-                image = face_recognition.load_image_file(file)
-                face_encoding = face_recognition.face_encodings(image)
-                if len(face_encoding) > 0:
-                    encodings.append(face_encoding[0])
-        user_encodings = {
-            'userId': userId,
-            'encodings': encodings
-        }
-        saved_encodings.append(user_encodings)
-
-    for encoding in saved_encodings:
-        for item in encoding['encodings']:
-            all_encodings.append(item)
-            encoding_user_ids.append(encoding['userId'])
-
-    with open(encodings_file_path,"wb") as fp:
-        pickle.dump(saved_encodings,fp)
-
-## TODO: Improve method of adding new encodings, just add the new one instead of going through all of them, like below
-## need to redesign how the model is trained/saved
-async def train_model_for_new_user(userId):
-    folderPath = Path(basePath + userId)
-
-    pathlist = [x for x in folderPath.iterdir() if x.is_dir()]
-
-    with folderPath as path:
-        encodings = []
-        if is_number(userId):
-            for file in path.glob('**/*.png'):
-                with open(file,"rb") as tst:
-                    f = tst.read()
-                    img = np.asarray(bytearray(f))
-                image = face_recognition.load_image_file(file)
-                face_encoding = face_recognition.face_encodings(image)[0]
-                all_encodings.append(face_encoding)
-                encoding_user_ids.append(userId)
 
 
 async def detect(websocket: WebSocket, queue: asyncio.Queue, async_state: any, db:Session):
@@ -317,41 +213,32 @@ async def detect(websocket: WebSocket, queue: asyncio.Queue, async_state: any, d
                 data = np.frombuffer(bytes, dtype=np.uint8)
                 img = cv2.imdecode(data, cv2.IMREAD_COLOR)
                 if img is not None:
-                    gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-                    ## TODO: remove the face classifier below, the "face_recognition" one seems to work better
-                    faces = cascade_classifier.detectMultiScale(gray)
+                    faces = face_recognition_controller.recognize_faces(img)
                     if async_state.app_mode == AppModes.DETECT:
                         # detect mode - do the face detection
-                        if len(faces) > 0:
-                            face_locations = face_recognition.face_locations(img)
-                            face_encodings = face_recognition.face_encodings(img,face_locations)
-                            user_ids_in_image = []
-                            for face in face_encodings:
-                                matches = face_recognition.compare_faces(all_encodings,face)
-                                i = 0
-                                while i<len(matches) and not matches[i]:
-                                    i = i+1
-                                user_ids_in_image.append(0 if i==len(matches) else encoding_user_ids[i])
-                            
+                        if len(faces) > 0:                           
                             # If there is just one identified user in the camera, set it as active
-                            if len(user_ids_in_image) == 1 and user_ids_in_image[0] != 0:
+                            if len(faces["user_ids"]) == 1 and faces["user_ids"][0] != 0:
                                 try:
-                                    await set_active_user(user_ids_in_image[0],db)
+                                    await set_active_user(faces["user_ids"][0],db)
                                 except Exception as e:
-                                    logger.error(f"Error recognizing user - {e}")
+                                    logger.error(f"Error setting user as active - {e}")
 
-                            faces_output = Faces(faces=faces.tolist(),app_state=async_state,detected_face = (user_ids_in_image))
+                            faces_output = Faces(faces=faces.tolist(),app_state=async_state,detected_face = (faces["user_ids"]))
                         else:
                             faces_output = Faces(faces=[],app_state=async_state,detected_face=[])
                         await websocket.send_text(faces_output.model_dump_json())
+
                     elif async_state.app_mode == AppModes.CAPTURE:
+
+                        ### TODO: move this logic to face_recognition_control.py
                         # program is in capture mode - do the capture & return to idle after
                         [img_height,img_width,n] = img.shape
                         if len(faces) == 1:
                             #Ensure we have a centered face and it's a big enough image:
                             # Values returned for the Faces are {x, y, width, height}
                             [x,y,width,height] = faces[0]
-                            if check_face_size(img_height=img_height,
+                            if face_recognition_controller.check_face_size(img_height=img_height,
                                             img_width=img_width,
                                             x=x,
                                             y=y,
@@ -360,16 +247,13 @@ async def detect(websocket: WebSocket, queue: asyncio.Queue, async_state: any, d
                                 # crop the image for the face only
                                 img = img[y:(y + height),x:(x + width)]
                                 async_state.saved_images = async_state.saved_images + 1
-                                # use user_id as a folder to store the images
-                                target_path = basePath + str(async_state.user_id) + "/" + baseName + str(async_state.saved_images) + ".png"
-                                logger.info("Saving at " + target_path)
                                 # capture desired number of images
                                 if async_state.saved_images < async_state.n_images:
-                                    await write_image(target_path,img)
+                                    face_recognition_controller.encode_new_image(async_state.user_id,img)
                                 else:
                                     # after capturing images, go to detect mode
                                     async_state.app_mode = AppModes.DETECT
-                                    await train_model()
+                                    face_recognition_controller.save_images_on_buffer()
                             faces_output = Faces(faces=faces.tolist(),app_state=async_state,detected_face=[])
                         else:
                             faces_output = Faces(faces=[],app_state=async_state,detected_face=[])
