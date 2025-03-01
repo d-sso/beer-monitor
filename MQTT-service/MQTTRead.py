@@ -1,17 +1,17 @@
 import paho.mqtt.client as mqtt # type: ignore
 import requests
-import secrets
+import local_secrets
 import datetime
 from threading import Timer
 
-TargetTopic = secrets.MQTT_info['target_topic']
-USERNAME = secrets.MQTT_info['username']
-PASSWORD = secrets.MQTT_info['password']
-api_url = secrets.MQTT_info['api_url']
+TargetTopic = local_secrets.MQTT_info['target_topic']
+USERNAME = local_secrets.MQTT_info['username']
+PASSWORD = local_secrets.MQTT_info['password']
+api_url = local_secrets.MQTT_info['api_url']
 
 def register_drink(value):
     print(value)
-    response = requests.post(url=api_url,json={"quantity":value})
+    response = requests.post(url=api_url,json={"quantity":value},verify=False)
     print(f"{datetime.datetime.now()} - Message sent to add {value}")
     print(response)
 
@@ -46,7 +46,7 @@ mqttc.username_pw_set(USERNAME,PASSWORD)
 mqttc.on_connect = on_connect
 mqttc.on_message = on_message
 
-mqttc.connect(secrets.MQTT_info['mqtt_server'], 1883, 60)
+mqttc.connect(local_secrets.MQTT_info['mqtt_server'], 1883, 60)
 
 # Blocking call that processes network traffic, dispatches callbacks and
 # handles reconnecting.

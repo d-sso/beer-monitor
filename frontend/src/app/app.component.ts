@@ -28,17 +28,30 @@ export class AppComponent {
   captureImageData:boolean = true
   refreshSubscription;
   observableSnapshot;
+  wsSocketProtocol = location.protocol === 'http:' ? 'ws' : 'wss';
   editing = false;
   recognizedFaces:Array<Array<number>> = [];
   webCamArea:HTMLCanvasElement | null = null;
 
   wsSubject = webSocket(
     {
-      url: 'ws://localhost:8000/face-detection',
+      url: this.wsSocketProtocol + '://' + location.hostname + ':8000/face-detection',
       binaryType: 'blob',
       serializer: v => v as Uint8ClampedArray,
     }
   );
+
+  facingMode: string = 'user';  //Set front camera
+  allowCameraSwitch = false;
+  
+  
+  public get videoOptions(): MediaTrackConstraints {
+      const result: MediaTrackConstraints = {};
+      if (this.facingMode && this.facingMode !== '') {
+          result.facingMode = { ideal: this.facingMode };
+      }
+      return result;
+  }
 
   refreshDrinkers(){
     var tempDrinkers:Drinker[] = [];

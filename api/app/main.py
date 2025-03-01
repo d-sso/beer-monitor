@@ -1,7 +1,7 @@
 # main.py
 import asyncio
 import asyncio.log
-import os
+
 from contextlib import asynccontextmanager
 import cv2
 import numpy as np
@@ -13,6 +13,7 @@ from app.models import Base, User, Drinks
 from app.schemas import UserSchema, DrinksSchema, DrinkQuantitySchema,UserWithDrinks
 from app.database import engine, SessionLocal
 from pydantic import BaseModel
+import ssl
 
 from sqlalchemy.orm import Session,selectinload
 import logging
@@ -69,6 +70,11 @@ async def lifespan(app: FastAPI):
     yield
 
 app =FastAPI(lifespan=lifespan) # initialize FastAPI
+ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+ssl_context.load_cert_chain(
+    "C:/Users/vihud/OneDrive/Documentos/Projects/PythonDev/KegaratorApp/beer-monitor/api/certificate/cert.pem"
+    ,keyfile="C:/Users/vihud/OneDrive/Documentos/Projects/PythonDev/KegaratorApp/beer-monitor/api/certificate/key.pem"
+    )
 
 origins = ['*']
 
