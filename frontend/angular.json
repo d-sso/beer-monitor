@@ -65,7 +65,13 @@
               "buildTarget": "BeerRanking:build:development"
             }
           },
-          "defaultConfiguration": "development"
+          "defaultConfiguration": "development",
+          "options": {
+            "host": "0.0.0.0",
+            "ssl": true,
+            "sslCert" : "C:/Users/vihud/OneDrive/Documentos/Projects/PythonDev/KegaratorApp/beer-monitor/api/certificate/cert.pem",
+            "sslKey" : "C:/Users/vihud/OneDrive/Documentos/Projects/PythonDev/KegaratorApp/beer-monitor/api/certificate/key.pem"
+          }
         },
         "extract-i18n": {
           "builder": "@angular-devkit/build-angular:extract-i18n"

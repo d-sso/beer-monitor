@@ -113,6 +113,7 @@ async def add_user(request:UserSchema, db: Session = Depends(get_db)):
     db.refresh(user)
     asyncState.app_mode = AppModes.CAPTURE
     asyncState.user_id = user.id
+    asyncState.saved_images = 0
 
     return user
 
@@ -210,6 +211,7 @@ async def detect(websocket: WebSocket, queue: asyncio.Queue, async_state: any, d
     ### TODO: figure out best way to gracefully close connection
     while True:
         try:
+            logger.info(f"Processing websocket data - AppMode: {asyncState.app_mode} ")
             if async_state.app_mode not in [AppModes.DETECT, AppModes.CAPTURE]:
                 # program is in idle mode - do nothing
                 faces_output = Faces(faces=[],app_state=async_state)
@@ -219,7 +221,9 @@ async def detect(websocket: WebSocket, queue: asyncio.Queue, async_state: any, d
                 data = np.frombuffer(bytes, dtype=np.uint8)
                 img = cv2.imdecode(data, cv2.IMREAD_COLOR)
                 if img is not None:
+                    logger.info(f"Received image, buffer shape: {img.shape} ")
                     faces = face_recognition_controller.recognize_faces(img)
+                    logger.info(f"Processed image, detected face ids: {faces['user_ids']} ")
                     if async_state.app_mode == AppModes.DETECT:
                         # detect mode - do the face detection
                         if len(faces['face_locations']) > 0:                           
@@ -229,33 +233,37 @@ async def detect(websocket: WebSocket, queue: asyncio.Queue, async_state: any, d
                                     await set_active_user(faces["user_ids"][0],db)
                                 except Exception as e:
                                     logger.error(f"Error setting user as active - {e}")
-
                             faces_output = Faces(faces=faces['face_locations'],app_state=async_state,detected_face = (faces["user_ids"]))
                         else:
                             faces_output = Faces(faces=[],app_state=async_state,detected_face=[])
+                        logger.info("Returning info to client")
                         await websocket.send_text(faces_output.model_dump_json())
 
                     elif async_state.app_mode == AppModes.CAPTURE:
                         ### TODO: move this logic to face_recognition_control.py
                         # program is in capture mode - do the capture & return to idle after
+                        logger.info(f"Capturing image - captured {async_state.saved_images} out of {async_state.n_images} images")
                         [img_height,img_width,n] = img.shape
-                        if len(faces['face_locations']) == 1:
+                        if len(faces['face_locations']) == 1 and (faces['user_ids'][0] == 0 or faces['user_ids'][0] == async_state.user_id):
                             #Ensure we have a centered face and it's a big enough image:
                             # Values returned for the Faces are {x, y, width, height}
-                            [x,y,width,height] = faces[0]
-                            if face_recognition_controller.check_face_size(img_height=img_height,
-                                            img_width=img_width,
-                                            x=x,
-                                            y=y,
-                                            width=width,
-                                            height=height):
+                            [x,y,width,height] = faces['face_locations'][0]
+                            #if face_recognition_controller.check_face_size(img_height=img_height,
+                            #                img_width=img_width,
+                            #                x=x,
+                            #                y=y,
+                            #                width=abs(width),
+                            #                height=abs(height)):
+                            if True:
                                 # crop the image for the face only
-                                img = img[y:(y + height),x:(x + width)]
+                                #img = img[y:(y + height),x:(x + width)]
                                 async_state.saved_images = async_state.saved_images + 1
                                 # capture desired number of images
                                 if async_state.saved_images < async_state.n_images:
+                                    logger.info("Encoding received image")
                                     face_recognition_controller.encode_new_image(async_state.user_id,img)
                                 else:
+                                    logger.info("Reached desired number of images, reverting to detect mode")
                                     # after capturing images, go to detect mode
                                     async_state.app_mode = AppModes.DETECT
                                     face_recognition_controller.save_images_on_buffer()

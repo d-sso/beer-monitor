@@ -83,7 +83,6 @@ class face_recognition_controller:
             return 1
         except Exception as e:
             self.logger.error(f"Could not encode new image - {e}")
-        finally:
             return -1
 
     def save_images_on_buffer(self):
@@ -98,7 +97,7 @@ class face_recognition_controller:
                 # iterate per item, if different user, change folder path. Might be a better way to do this.
                 if item["user_id"] != curr_user_id:
                     curr_user_id = item["user_id"]
-                    user_folder_path = self.get_user_folder_path(item["user_id"])
+                    user_folder_path = self.get_user_folder_path(str(item["user_id"]))
                 ### TODO currently will save incrementing the number of images in the folder, perhaps a good idea to overwrite them
                 self.save_image(user_folder_path + "\\img" + str(len(os.listdir(user_folder_path))) + ".png", item["img"])
         except Exception as e:
