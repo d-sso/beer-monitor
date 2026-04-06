@@ -213,8 +213,68 @@ export class AppComponent {
     );
   }
 
+  private lastFrameData: Uint8ClampedArray | null = null;
+  private lastSentTime: number = 0;
+  private motionThreshold: number = 30; // Threshold for pixel difference
+  private minMotionPixels: number = 500; // Minimum number of changed pixels to trigger motion
+
   processCamSnapshot(camImage: WebcamImage){
-    this.wsSubject.next(camImage.imageAsDataUrl);
+    const now = Date.now();
+    if (now - this.lastSentTime < 500) {
+      return; // Rate limit to 500ms
+    }
+
+    if (this.detectMotion(camImage)) {
+      this.wsSubject.next(camImage.imageAsDataUrl);
+      this.lastSentTime = now;
+    }
+  }
+
+  private motionCanvas: HTMLCanvasElement = document.createElement('canvas');
+
+  private detectMotion(camImage: WebcamImage): boolean {
+    if (!this.lastFrameData) {
+      this.updateLastFrame(camImage);
+      return true;
+    }
+
+    const currentFrameData = this.getFrameData(camImage);
+    if (!currentFrameData) return true;
+
+    let diffCount = 0;
+    for (let i = 0; i < currentFrameData.length; i += 4) {
+      // Simple difference calculation (averaging R, G, B channels)
+      const rDiff = Math.abs(currentFrameData[i] - this.lastFrameData[i]);
+      const gDiff = Math.abs(currentFrameData[i+1] - this.lastFrameData[i+1]);
+      const bDiff = Math.abs(currentFrameData[i+2] - this.lastFrameData[i+2]);
+      
+      if ((rDiff + gDiff + bDiff) / 3 > this.motionThreshold) {
+        diffCount++;
+      }
+    }
+
+    this.lastFrameData = currentFrameData;
+    return diffCount > this.minMotionPixels;
+  }
+
+  private updateLastFrame(camImage: WebcamImage) {
+    this.lastFrameData = this.getFrameData(camImage);
+  }
+
+  private getFrameData(camImage: WebcamImage): Uint8ClampedArray | null {
+    const ctx = this.motionCanvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return null;
+    
+    // Resize canvas if needed
+    const width = camImage.imageData.width;
+    const height = camImage.imageData.height;
+    if (this.motionCanvas.width !== width || this.motionCanvas.height !== height) {
+      this.motionCanvas.width = width;
+      this.motionCanvas.height = height;
+    }
+    
+    // We can use the imageData directly from camImage if it's available
+    return camImage.imageData.data;
   }
 
 
