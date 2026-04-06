@@ -174,107 +174,61 @@ async def add_drink(request:DrinkQuantitySchema, db: Session = Depends(get_db)):
     return drink
 
 
+import redis
+import json
+
+# Redis configuration
+redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+r = redis.from_url(redis_url)
+
 ### SECTION for handling the web sockets and images
-async def receive(websocket: WebSocket, queue: asyncio.Queue):
+async def receive(websocket: WebSocket):
     """
     This is the asynchronous function that will be used to receive webscoket 
     connections from the web page
     """
-    logger.info("Received new image")
     base64img = await websocket.receive()
     try:
         base64img_split = base64img['text'].split(',')
         if base64img_split[0] == 'data:image/jpeg;base64':
             try:
-                numpy_array = np.frombuffer(base64.b64decode(base64img_split[1]),np.uint8)
-                queue.put_nowait(numpy_array)
-            except asyncio.QueueFull:
-                # drop queued items
-                while not queue.empty():
-                    queue.get_nowait()
-                    queue.task_done()
-                logger.info("Queue was full and flushed")
-                pass
+                # Push the raw base64 decoded bytes to redis queue
+                image_bytes = base64.b64decode(base64img_split[1])
+                # We can limit the queue size by checking length first or just lpush
+                # Using a fixed queue name 'frame_queue'
+                r.lpush('frame_queue', image_bytes)
+                r.ltrim('frame_queue', 0, 10) # Keep only 10 frames in queue
+            except Exception as e:
+                logger.error(f"Error pushing to redis: {e}")
         else:
-            logger.info('Received bad image')
+            logger.info('Received bad image format')
     except Exception as e:
-        logger.error("Error parsing data received - " + e)
+        logger.error(f"Error parsing data received - {e}")
 
 
-async def detect(websocket: WebSocket, queue: asyncio.Queue, async_state: any, db:Session):
+async def detect(websocket: WebSocket, async_state: any):
     """
-    This function takes the received request and sends it to our classifier
-    which then goes through the data to detect the presence of a human face
-    and returns the location of the face from the continous stream of visual data as a
-    list of Tuple of 4 integers that will represent the 4 Sides of a rectangle
+    This function retrieves the latest detection results from Redis
+    and sends them to the frontend
     """
-    ### TODO: figure out best way to gracefully close connection
     while True:
         try:
-            logger.info(f"Processing websocket data - AppMode: {asyncState.app_mode} ")
-            if async_state.app_mode not in [AppModes.DETECT, AppModes.CAPTURE]:
-                # program is in idle mode - do nothing
-                faces_output = Faces(faces=[],app_state=async_state)
+            # Periodically check Redis for the latest face locations/ids
+            last_results = r.get('last_face_locations')
+            if last_results:
+                results = json.loads(last_results)
+                faces_output = Faces(
+                    faces=results.get('face_locations', []),
+                    app_state=async_state,
+                    detected_face=results.get('user_ids', [])
+                )
                 await websocket.send_text(faces_output.model_dump_json())
-            else:
-                bytes = await queue.get()
-                data = np.frombuffer(bytes, dtype=np.uint8)
-                img = cv2.imdecode(data, cv2.IMREAD_COLOR)
-                if img is not None:
-                    logger.info(f"Received image, buffer shape: {img.shape} ")
-                    faces = face_recognition_controller.recognize_faces(img)
-                    logger.info(f"Processed image, detected face ids: {faces['user_ids']} ")
-                    if async_state.app_mode == AppModes.DETECT:
-                        # detect mode - do the face detection
-                        if len(faces['face_locations']) > 0:                           
-                            # If there is just one identified user in the camera, set it as active
-                            if len(faces["user_ids"]) == 1 and faces["user_ids"][0] != 0:
-                                try:
-                                    await set_active_user(faces["user_ids"][0],db)
-                                except Exception as e:
-                                    logger.error(f"Error setting user as active - {e}")
-                            faces_output = Faces(faces=faces['face_locations'],app_state=async_state,detected_face = (faces["user_ids"]))
-                        else:
-                            faces_output = Faces(faces=[],app_state=async_state,detected_face=[])
-                        logger.info("Returning info to client")
-                        await websocket.send_text(faces_output.model_dump_json())
-
-                    elif async_state.app_mode == AppModes.CAPTURE:
-                        ### TODO: move this logic to face_recognition_control.py
-                        # program is in capture mode - do the capture & return to idle after
-                        logger.info(f"Capturing image - captured {async_state.saved_images} out of {async_state.n_images} images")
-                        [img_height,img_width,n] = img.shape
-                        if len(faces['face_locations']) == 1 and (faces['user_ids'][0] == 0 or faces['user_ids'][0] == async_state.user_id):
-                            #Ensure we have a centered face and it's a big enough image:
-                            # Values returned for the Faces are {x, y, width, height}
-                            [x,y,width,height] = faces['face_locations'][0]
-                            #if face_recognition_controller.check_face_size(img_height=img_height,
-                            #                img_width=img_width,
-                            #                x=x,
-                            #                y=y,
-                            #                width=abs(width),
-                            #                height=abs(height)):
-                            if True:
-                                # crop the image for the face only
-                                #img = img[y:(y + height),x:(x + width)]
-                                async_state.saved_images = async_state.saved_images + 1
-                                # capture desired number of images
-                                if async_state.saved_images < async_state.n_images:
-                                    logger.info("Encoding received image")
-                                    face_recognition_controller.encode_new_image(async_state.user_id,img)
-                                else:
-                                    logger.info("Reached desired number of images, reverting to detect mode")
-                                    # after capturing images, go to detect mode
-                                    async_state.app_mode = AppModes.DETECT
-                                    face_recognition_controller.save_images_on_buffer()
-                            faces_output = Faces(faces=faces['face_locations'],app_state=async_state,detected_face=[])
-                        else:
-                            faces_output = Faces(faces=[],app_state=async_state,detected_face=[])
-                        await websocket.send_text(faces_output.model_dump_json())
-                else:
-                    logger.info("Empty image received")
+            
+            # Small delay to not overwhelm the websocket with redundant data
+            await asyncio.sleep(0.1)
         except Exception as e:
-            logger.error(f"Error processing image - {e}")
+            logger.error(f"Error in detect loop - {e}")
+            await asyncio.sleep(1)
 
 @app.websocket("/face-detection")
 async def face_detection(websocket: WebSocket,db: Session = Depends(get_db)):
@@ -284,18 +238,18 @@ async def face_detection(websocket: WebSocket,db: Session = Depends(get_db)):
     """
     await websocket.accept()
 
-    queue: asyncio.Queue = asyncio.Queue(maxsize=10)
-    detect_task = asyncio.create_task(detect(websocket, queue,asyncState,db))
+    detect_task = asyncio.create_task(detect(websocket, asyncState))
 
     try:
         while True:
-            await receive(websocket, queue)
+            await receive(websocket)
     except WebSocketDisconnect:
         detect_task.cancel()
-        await websocket.close()
+    except Exception as e:
+        logger.error(f"WebSocket error: {e}")
     finally:
         detect_task.cancel()
-        await websocket.close()
+        # await websocket.close() # Might already be closed
 
 @app.post("/recordFace")
 async def record_face(id):

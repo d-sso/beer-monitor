@@ -1,5 +1,11 @@
 version: "3.9"
 services:
+  redis:
+    image: "redis:alpine"
+    container_name: redis-beer
+    ports:
+      - "6379:6379"
+
   api:
     container_name: fastapi-beer
     restart: always
@@ -8,6 +14,33 @@ services:
       dockerfile: "Dockerfile"
     ports:
       - "8000:80"
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=sqlite:///./beer.db
+      - IMAGES_PATH=/data/imgs
+      - MODEL_PATH=/data/saved_encodings
+    volumes:
+      - ./api/data:/data
+    depends_on:
+      - redis
+
+  face-recognition-worker:
+    container_name: worker-beer
+    restart: always
+    build:
+      context: "api"
+      dockerfile: "Dockerfile"
+    command: python -m app.worker
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=sqlite:///./beer.db
+      - IMAGES_PATH=/data/imgs
+      - MODEL_PATH=/data/saved_encodings
+    volumes:
+      - ./api/data:/data
+    depends_on:
+      - redis
+      - api
   frontend:
     container_name: frontend-beer
     restart: always
@@ -24,3 +57,12 @@ services:
     build:
       context: "MQTT-service"
       dockerfile: "Dockerfile"
+    environment:
+      - MQTT_TARGET_TOPIC=beer/quantity
+      - MQTT_USERNAME=your_username
+      - MQTT_PASSWORD=your_password
+      - API_URL=http://api:80/drinks
+      - MQTT_SERVER=homeassistant.local
+      - MQTT_PORT=1883
+    depends_on:
+      - api

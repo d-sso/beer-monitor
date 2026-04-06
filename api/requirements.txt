@@ -5,3 +5,5 @@ asyncio
 opencv-python
 numpy
 face_recognition
+redis
+python-multipart

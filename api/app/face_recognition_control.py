@@ -12,8 +12,8 @@ def transform_coordinates(location):
 
 class face_recognition_controller:
     
-    model_file_path = 'C:\\Users\\vihud\\OneDrive\\Documentos\\Projects\\PythonDev\\DetectFace\\saved_encodings'
-    images_path = 'C:\\Users\\vihud\\OneDrive\\Documentos\\Projects\\PythonDev\\DetectFace\\imgs\\'
+    model_file_path = os.environ.get('MODEL_PATH', 'saved_encodings')
+    images_path = os.environ.get('IMAGES_PATH', 'imgs/')
     face_encodings = []
     user_ids = []
     buffer_images_to_save = None
