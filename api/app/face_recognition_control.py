@@ -5,6 +5,8 @@ import os
 from pathlib import Path
 import app.util as util
 import numpy as np
+from app.database import SessionLocal
+from app.models import User
 
 def transform_coordinates(location):
     [top,right,bottom,left] = location
@@ -27,18 +29,39 @@ class face_recognition_controller:
         self.buffer_images_to_save = list()
     
     def load_model(self):
+        """
+        Loads face encodings from the database.
+        """
         try:
-            #self.train_model()
+            db = SessionLocal()
+            users = db.query(User).filter(User.face_encoding != None).all()
             self.face_encodings = []
             self.user_ids = []
-            with open(self.model_file_path,"rb") as saved_encodings:
-                loaded_encodings = pickle.load(saved_encodings)
-                self.face_encodings = loaded_encodings['encodings']
-                self.user_ids = loaded_encodings['userId']
+            for user in users:
+                # Deserialize from bytes to numpy array
+                encoding = np.frombuffer(user.face_encoding, dtype=np.float64)
+                self.face_encodings.append(encoding)
+                self.user_ids.append(user.id)
+            db.close()
+            self.logger.info(f"Loaded {len(self.face_encodings)} face encodings from database.")
         except Exception as e:
-            self.logger.error(f"Could not load model - {e}")
-            self.logger.info(f"Trying to retrain")
-            self.train_model()
+            self.logger.error(f"Could not load model from database - {e}")
+
+    def save_encoding_to_db(self, user_id, encoding):
+        """
+        Saves a single face encoding to the database for a specific user.
+        """
+        try:
+            db = SessionLocal()
+            user = db.query(User).get(int(user_id))
+            if user:
+                # Serialize numpy array to bytes
+                user.face_encoding = encoding.tobytes()
+                db.commit()
+                self.logger.info(f"Saved face encoding for user {user.name} to database.")
+            db.close()
+        except Exception as e:
+            self.logger.error(f"Could not save encoding to database for user {user_id} - {e}")
 
     def get_user_folder_path(self,user_id:str):
         """	
@@ -72,8 +95,14 @@ class face_recognition_controller:
                 self.logger.error(f"More than one face detected in image")
                 return len(face_locations)
             face_encoding = face_recognition.face_encodings(img, face_locations)[0]
+            
+            # Save to database immediately
+            self.save_encoding_to_db(user_id, face_encoding)
+            
+            # Update local lists
             self.face_encodings.append(face_encoding)
             self.user_ids.append(user_id)
+            
             self.buffer_images_to_save.append(
                 {
                     "user_id": user_id,
@@ -169,28 +198,29 @@ class face_recognition_controller:
             return {}
     
     def train_model(self):
+        """
+        Legacy method updated to save to database.
+        """
         try:
             folderPath = Path(self.images_path)
+            if not folderPath.exists():
+                return
 
             pathlist = [x for x in folderPath.iterdir() if x.is_dir()]
 
             for path in pathlist:
-                encodings = []
                 userId = path.name
                 if util.is_number(userId):
                     for file in path.glob('**/*.png'):
                         image = face_recognition.load_image_file(file)
-                        face_encoding = face_recognition.face_encodings(image)
-                        if len(face_encoding) > 0:
-                            self.face_encodings.append(face_encoding[0])
-                            self.user_ids.append(userId)
-
-            model_dump = {
-                "encodings": self.face_encodings,
-                "userId": self.user_ids
-            }
-            with open(self.model_file_path,"wb") as fp:
-                pickle.dump(model_dump,fp)
+                        face_encodings = face_recognition.face_encodings(image)
+                        if len(face_encodings) > 0:
+                            # We'll just take the first one found in the folder for now
+                            self.save_encoding_to_db(userId, face_encodings[0])
+                            break # Found one, move to next user
+            
+            # Reload from DB to refresh local state
+            self.load_model()
         except Exception as e:
             self.logger.error(f"Could not train model - {e}")
 

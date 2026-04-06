@@ -1,4 +1,4 @@
-from sqlalchemy import Column,Integer,String, Double, DateTime, ForeignKey,Boolean
+from sqlalchemy import Column,Integer,String, Double, DateTime, ForeignKey,Boolean, LargeBinary
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship,Mapped, mapped_column
 from typing import List
@@ -12,6 +12,7 @@ class User(Base):
     email = Column(String)
     nickname = Column(String)
     active = Column(Boolean, default=False)
+    face_encoding = Column(LargeBinary, nullable=True)
 
     drinks: Mapped[List["Drinks"]] = relationship(back_populates="user")
 
