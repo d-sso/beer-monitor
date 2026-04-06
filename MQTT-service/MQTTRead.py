@@ -57,16 +57,20 @@ def on_message(client, userdata, msg):
         print(f"{datetime.datetime.now()} - Error processing message: {e}")
 
 
-mqttc = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
-if USERNAME and PASSWORD:
-    mqttc.username_pw_set(USERNAME,PASSWORD)
-mqttc.on_connect = on_connect
-mqttc.on_message = on_message
+def main():
+    mqttc = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+    if USERNAME and PASSWORD:
+        mqttc.username_pw_set(USERNAME,PASSWORD)
+    mqttc.on_connect = on_connect
+    mqttc.on_message = on_message
 
-mqttc.connect(mqtt_server, mqtt_port, 60)
+    mqttc.connect(mqtt_server, mqtt_port, 60)
 
-# Blocking call that processes network traffic, dispatches callbacks and
-# handles reconnecting.
-# Other loop*() functions are available that give a threaded interface and a
-# manual interface.
-mqttc.loop_forever()
+    # Blocking call that processes network traffic, dispatches callbacks and
+    # handles reconnecting.
+    # Other loop*() functions are available that give a threaded interface and a
+    # manual interface.
+    mqttc.loop_forever()
+
+if __name__ == "__main__":
+    main()
