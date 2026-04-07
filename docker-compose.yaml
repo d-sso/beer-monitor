@@ -21,6 +21,7 @@ services:
       - MODEL_PATH=/data/saved_encodings
     volumes:
       - ./api/data:/data
+      - ./api/certificate:/code/certificate
     depends_on:
       - redis
 

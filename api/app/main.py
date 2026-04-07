@@ -1,4 +1,5 @@
 # main.py
+import os
 import asyncio
 import asyncio.log
 
@@ -71,10 +72,13 @@ async def lifespan(app: FastAPI):
 
 app =FastAPI(lifespan=lifespan) # initialize FastAPI
 ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-ssl_context.load_cert_chain(
-    "C:/Users/vihud/OneDrive/Documentos/Projects/PythonDev/KegaratorApp/beer-monitor/api/certificate/cert.pem"
-    ,keyfile="C:/Users/vihud/OneDrive/Documentos/Projects/PythonDev/KegaratorApp/beer-monitor/api/certificate/key.pem"
-    )
+cert_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "certificate", "cert.pem")
+key_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "certificate", "key.pem")
+
+if os.path.exists(cert_path) and os.path.exists(key_path):
+    ssl_context.load_cert_chain(cert_path, keyfile=key_path)
+else:
+    logger.warning(f"Certificates not found at {cert_path} or {key_path}. SSL might not be enabled.")
 
 origins = ['*']
 
@@ -174,7 +178,6 @@ async def add_drink(request:DrinkQuantitySchema, db: Session = Depends(get_db)):
     return drink
 
 
-import os
 import redis
 import json
 
