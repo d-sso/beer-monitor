@@ -1,10 +1,14 @@
 import pytest
-from sqlalchemy import create_all, create_engine
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 from fastapi.testclient import TestClient
+from unittest.mock import patch, MagicMock
+import ssl
 
-from app.main import app, get_db
+# Mock SSLContext before importing app.main
+with patch("ssl.SSLContext.load_cert_chain"):
+    from app.main import app, get_db
 from app.database import Base
 
 # Setup an in-memory SQLite database for tests

@@ -129,8 +129,8 @@ async def get_active_user(db: Session = Depends(get_db)):
 
 async def set_active_user(id,db: Session):
     logger.info(f"Setting active user: {id}")
-    user = db.query(User).get(int(id))
-    if not user.active:
+    user = db.get(User, int(id))
+    if user and not user.active:
         currentActive = db.query(User).filter(User.active == True).first()
         if currentActive:
             currentActive.active = False
@@ -141,7 +141,7 @@ async def set_active_user(id,db: Session):
 
 @app.put("/user/active/{id}")
 async def endpoint_set_active_user(id,db: Session = Depends(get_db)):
-    return set_active_user(id,db)
+    return await set_active_user(id,db)
 
 @app.get("/user/{user_name}")
 async def get_users(user_name, db: Session = Depends(get_db)):
@@ -174,6 +174,7 @@ async def add_drink(request:DrinkQuantitySchema, db: Session = Depends(get_db)):
     return drink
 
 
+import os
 import redis
 import json
 
@@ -271,4 +272,7 @@ async def detect_face():
     asyncState.user_id = 0
     return asyncState
 
-app.mount("/", StaticFiles(directory="static"), name="static")
+static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
+if not os.path.exists(static_dir):
+    os.makedirs(static_dir)
+app.mount("/", StaticFiles(directory=static_dir), name="static")

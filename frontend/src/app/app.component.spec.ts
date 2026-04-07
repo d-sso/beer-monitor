@@ -1,4 +1,4 @@
-import { TestBed, ComponentFixture } from '@angular/core/testing';
+import { TestBed, ComponentFixture, fakeAsync, tick } from '@angular/core/testing';
 import { AppComponent } from './app.component';
 import { DrinksService } from './drinks.service';
 import { of } from 'rxjs';
@@ -12,6 +12,11 @@ describe('AppComponent', () => {
   beforeEach(async () => {
     mockDrinksService = jasmine.createSpyObj('DrinksService', ['getDrinkers', 'addDrinker']);
     mockDrinksService.getDrinkers.and.returnValue(of([]));
+    
+    // Prevent the real startIntervals from running
+    spyOn(AppComponent.prototype, 'startIntervals').and.callFake(function(this: any) {
+      this.observableSnapshot = of();
+    });
 
     await TestBed.configureTestingModule({
       imports: [AppComponent],
@@ -33,7 +38,7 @@ describe('AppComponent', () => {
     expect(mockDrinksService.getDrinkers).toHaveBeenCalled();
   });
 
-  it('should rate limit cam snapshots to 500ms', () => {
+  it('should rate limit cam snapshots to 500ms', fakeAsync(() => {
     const mockWs = jasmine.createSpyObj('WebSocketSubject', ['next']);
     (app as any).wsSubject = mockWs;
 
@@ -44,14 +49,22 @@ describe('AppComponent', () => {
 
     // First call should send
     app.processCamSnapshot(mockImage);
+    tick(100);
     expect(mockWs.next).toHaveBeenCalledTimes(1);
 
     // Immediate second call should be ignored
     app.processCamSnapshot(mockImage);
+    tick(100);
     expect(mockWs.next).toHaveBeenCalledTimes(1);
-  });
+    
+    // Call after 600ms should send
+    tick(600);
+    app.processCamSnapshot(mockImage);
+    tick(100);
+    expect(mockWs.next).toHaveBeenCalledTimes(2);
+  }));
 
-  it('should recognize motion if pixels change significantly', () => {
+  it('should recognize motion if pixels change significantly', fakeAsync(() => {
     const mockWs = jasmine.createSpyObj('WebSocketSubject', ['next']);
     (app as any).wsSubject = mockWs;
     
@@ -69,14 +82,21 @@ describe('AppComponent', () => {
       imageData: { width: 1, height: 1, data: new Uint8ClampedArray([255, 255, 255, 255]) }
     } as unknown as WebcamImage;
 
-    // Reset lastSentTime for the test
+    // Reset state
     (app as any).lastSentTime = 0;
-    app.processCamSnapshot(img1); // Sets baseline
+    (app as any).lastFrameData = null;
+
+    // img1: baseline
+    app.processCamSnapshot(img1); 
+    tick(100);
     
-    // Manually reset lastSentTime to bypass rate limiting
-    (app as any).lastSentTime = 0;
-    app.processCamSnapshot(img2); // Triggers motion detection
+    // Advance time to bypass rate limit
+    tick(600);
+    
+    // img2: different from img1
+    app.processCamSnapshot(img2); 
+    tick(100);
     
     expect(mockWs.next).toHaveBeenCalledTimes(2);
-  });
+  }));
 });

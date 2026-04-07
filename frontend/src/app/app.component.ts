@@ -26,8 +26,8 @@ export class AppComponent {
   title = 'Beer Ranking';
   componentTitle = "Beer Ranking";
   captureImageData:boolean = true
-  refreshSubscription;
-  observableSnapshot;
+  refreshSubscription: any;
+  observableSnapshot: any;
   wsSocketProtocol = location.protocol === 'http:' ? 'ws' : 'wss';
   editing = false;
   recognizedFaces:Array<Array<number>> = [];
@@ -69,22 +69,7 @@ export class AppComponent {
 
   constructor(private drinksService: DrinksService){
     this.refreshDrinkers();
-    this.refreshSubscription = interval(5000).subscribe(
-      val => {
-        console.log(val); 
-        this.refreshDrinkers();
-      }
-    );
-
-    //Take snapshots of the webcam
-    this.observableSnapshot = new Observable<void>(
-      observer => {
-        setInterval(()=>{
-                  observer.next(void 0);
-                  //console.log("Observer called");
-                },500)
-              }
-        );
+    this.startIntervals();
 
     //Subscribe to the web socket
     this.wsSubject.subscribe({
@@ -134,6 +119,25 @@ export class AppComponent {
       complete: () => console.log("Connection closed")
       }
     )
+  }
+
+  startIntervals() {
+    this.refreshSubscription = interval(5000).subscribe(
+      val => {
+        console.log(val); 
+        this.refreshDrinkers();
+      }
+    );
+
+    //Take snapshots of the webcam
+    this.observableSnapshot = new Observable<void>(
+      observer => {
+        setInterval(()=>{
+                  observer.next(void 0);
+                  //console.log("Observer called");
+                },500)
+              }
+        );
   }
 
   filter: "all" | "active" | "active" = "all";

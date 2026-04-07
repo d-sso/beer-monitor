@@ -6,10 +6,10 @@ from app.models import Drinks
 from typing import List
 
 class UserSchema(BaseModel):
-    id: int
+    id: Optional[int] = None
     name: str
-    email: str
-    nickname: str
+    email: Optional[str] = None
+    nickname: Optional[str] = None
 
 class DrinksSchema(BaseModel):
     user_id: int
