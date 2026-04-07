@@ -41,32 +41,35 @@ def process_frames():
     while True:
         try:
             # Pop a frame from the queue
-            # 'frame_queue' will contain serialized images
             _, data = r.brpop('frame_queue')
-            
+
             # Decode image
             nparr = np.frombuffer(data, np.uint8)
             img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-            
+
             if img is not None:
-                # Perform recognition
                 results = fr_controller.recognize_faces(img)
                 user_ids = results.get('user_ids', [])
-                
-                if user_ids:
-                    # Filter out unknown users (0)
+                confidence_scores = results.get('confidence_scores', [])
+
+                if not user_ids:
+                    logger.debug("No faces detected in frame")
+                else:
+                    for uid, conf in zip(user_ids, confidence_scores):
+                        if uid == 0:
+                            logger.info("Face detected but not recognized (unknown)")
+                        else:
+                            conf_str = f"{conf:.1f}%" if conf is not None else "N/A"
+                            logger.info(f"Face recognized: user_id={uid}, confidence={conf_str}")
+
                     known_users = [uid for uid in user_ids if uid != 0]
-                    
                     if len(known_users) == 1:
-                        user_id = known_users[0]
-                        set_active_user(user_id)
-                        
-                        # Store result in Redis for the API to pick up if needed
-                        # We can use a key per websocket session or a global "last detected"
+                        set_active_user(known_users[0])
                         r.set('last_detected_user', json.dumps(results))
-                        r.expire('last_detected_user', 5) # Expire after 5 seconds
-                
-                # Also store the face locations for the UI to draw boxes
+                        r.expire('last_detected_user', 5)
+                    elif len(known_users) > 1:
+                        logger.warning(f"Multiple known users detected in one frame ({known_users}), skipping activation")
+
                 r.set('last_face_locations', json.dumps(results))
                 r.expire('last_face_locations', 2)
 

@@ -108,13 +108,14 @@ async def add_user(request:UserSchema, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.name == request.name).first()
     if user:
         asyncState.app_mode = AppModes.DETECT
-        logger.info("User already exists")
+        logger.info(f"User already exists: '{request.name}' (ID: {user.id})")
         return user
-    
+
     user = User(name = request.name, email = request.email, nickname = request.nickname)
     db.add(user)
     db.commit()
     db.refresh(user)
+    logger.info(f"User created: '{user.name}' (ID: {user.id}, nickname: '{user.nickname}')")
     asyncState.app_mode = AppModes.CAPTURE
     asyncState.user_id = user.id
     asyncState.saved_images = 0
@@ -132,15 +133,18 @@ async def get_active_user(db: Session = Depends(get_db)):
     return user
 
 async def set_active_user(id,db: Session):
-    logger.info(f"Setting active user: {id}")
     user = db.get(User, int(id))
     if user and not user.active:
         currentActive = db.query(User).filter(User.active == True).first()
+        prev = f"'{currentActive.name}'" if currentActive else "none"
         if currentActive:
             currentActive.active = False
         user.active = True
         db.commit()
         db.refresh(user)
+        logger.info(f"Active user changed: {prev} -> '{user.name}' (ID: {user.id})")
+    else:
+        logger.debug(f"set_active_user: user '{getattr(user, 'name', id)}' already active or not found")
     return user
 
 @app.put("/user/active/{id}")
@@ -160,21 +164,24 @@ async def get_drinks(db: Session = Depends(get_db)):
 
 @app.post("/addDrink")
 async def add_drink(request:DrinksSchema, db: Session = Depends(get_db)):
-    drink = Drinks(user_id=request.user_id,quantity=request.quantity)
-    print(request.quantity)
+    drink = Drinks(user_id=request.user_id, quantity=request.quantity)
     db.add(drink)
     db.commit()
     db.refresh(drink)
+    logger.info(f"Drink added: {request.quantity:.1f}ml for user_id={request.user_id} (drink_id={drink.id})")
     return drink
 
 @app.post("/addDrinkToActiveUser")
-async def add_drink(request:DrinkQuantitySchema, db: Session = Depends(get_db)):
+async def add_drink_to_active(request:DrinkQuantitySchema, db: Session = Depends(get_db)):
     currentActive = db.query(User).filter(User.active == True).first()
-    drink = Drinks(user_id=currentActive.id,quantity=request.quantity)
-    print(request.quantity)
+    if not currentActive:
+        logger.warning("addDrinkToActiveUser called but no user is currently active")
+        raise HTTPException(status_code=400, detail="No active user")
+    drink = Drinks(user_id=currentActive.id, quantity=request.quantity)
     db.add(drink)
     db.commit()
     db.refresh(drink)
+    logger.info(f"Drink added: {request.quantity:.1f}ml for '{currentActive.name}' (user_id={currentActive.id}, drink_id={drink.id})")
     return drink
 
 

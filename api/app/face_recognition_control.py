@@ -174,25 +174,34 @@ class face_recognition_controller:
         img (numpy.ndarray): The image in which to recognize faces.
 
         Returns:
-        dict: A dictionary with two keys:
+        dict: A dictionary with keys:
             - 'face_locations': A list of tuples representing the bounding boxes of the detected faces.
-            - 'user_ids': A list of user IDs corresponding to the recognized faces.
+            - 'user_ids': A list of user IDs corresponding to the recognized faces (0 = unknown).
+            - 'confidence_scores': A list of confidence percentages (0-100) for each recognized face,
+              or None for faces that did not match any known user.
         """
         try:
             face_locations = self.detect_faces(img)
+            self.logger.debug(f"Detected {len(face_locations)} face(s) in frame")
             face_encodings = face_recognition.face_encodings(img, face_locations)
             user_ids = []
+            confidence_scores = []
             for face_encoding in face_encodings:
                 matches = face_recognition.compare_faces(self.face_encodings, face_encoding)
                 user_id = 0
+                confidence = None
                 if True in matches:
                     first_match_index = matches.index(True)
                     user_id = self.user_ids[first_match_index]
+                    distances = face_recognition.face_distance(self.face_encodings, face_encoding)
+                    confidence = round((1.0 - float(distances[first_match_index])) * 100, 1)
                 user_ids.append(user_id)
+                confidence_scores.append(confidence)
             return {
-                    "face_locations": [transform_coordinates(item) for item in face_locations],
-                    "user_ids": user_ids
-                }
+                "face_locations": [transform_coordinates(item) for item in face_locations],
+                "user_ids": user_ids,
+                "confidence_scores": confidence_scores,
+            }
         except Exception as e:
             self.logger.error(f"Could not recognize faces - {e}")
             return {}
