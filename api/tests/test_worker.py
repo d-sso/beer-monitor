@@ -6,6 +6,14 @@ import json
 from app.worker import process_frames, set_active_user
 from app.models import User
 
+
+@pytest.fixture
+def blank_jpeg():
+    """Returns bytes for a minimal valid JPEG so cv2.imdecode succeeds."""
+    img = np.zeros((64, 64, 3), dtype=np.uint8)
+    _, encoded = cv2.imencode('.jpg', img)
+    return encoded.tobytes()
+
 @patch("app.worker.SessionLocal")
 def test_set_active_user(mock_session_local):
     """
@@ -43,25 +51,12 @@ def test_set_active_user(mock_session_local):
 @patch("app.worker.r")
 @patch("app.worker.fr_controller")
 @patch("app.worker.set_active_user")
-def test_process_frames_recognizes_user(mock_set_active, mock_fr, mock_redis):
+def test_process_frames_recognizes_user(mock_set_active, mock_fr, mock_redis, blank_jpeg):
     """
     Tests that the worker correctly processes an image frame, identifies a user,
     and triggers their activation.
     """
-    # Build a valid JPEG image so cv2.imdecode returns a real array
-    blank = np.zeros((64, 64, 3), dtype=np.uint8)
-    _, encoded = cv2.imencode('.jpg', blank)
-    img_bytes = encoded.tobytes()
-
-    # First call returns a valid frame; second raises SystemExit to break the
-    # infinite loop. SystemExit is not caught by `except Exception`, so it
-    # propagates cleanly out of process_frames().
-    mock_redis.brpop.side_effect = [
-        ("frame_queue", img_bytes),
-        SystemExit(0),
-    ]
-
-    # Mock face recognition to return a known user ID and confidence score
+    mock_redis.brpop.side_effect = [("frame_queue", blank_jpeg), SystemExit(0)]
     mock_fr.recognize_faces.return_value = {
         "user_ids": [123],
         "face_locations": [[10, 10, 50, 50]],
@@ -71,8 +66,84 @@ def test_process_frames_recognizes_user(mock_set_active, mock_fr, mock_redis):
     with pytest.raises(SystemExit):
         process_frames()
 
-    # Verify recognition was called and the user was activated
     mock_fr.recognize_faces.assert_called_once()
     mock_set_active.assert_called_once_with(123)
-    # Verify face locations were stored in Redis
     mock_redis.set.assert_any_call('last_face_locations', ANY)
+
+
+# ---------------------------------------------------------------------------
+# New tests
+# ---------------------------------------------------------------------------
+
+@patch("app.worker.SessionLocal")
+def test_set_active_user_already_active(mock_session_local):
+    """set_active_user does nothing when the target user is already active."""
+    mock_db = MagicMock()
+    mock_session_local.return_value = mock_db
+    mock_db.query.return_value.get.return_value = User(id=1, name="Same", active=True)
+
+    set_active_user(1)
+
+    mock_db.commit.assert_not_called()
+
+
+@patch("app.worker.SessionLocal")
+def test_set_active_user_not_found(mock_session_local):
+    """set_active_user does nothing when the user ID does not exist."""
+    mock_db = MagicMock()
+    mock_session_local.return_value = mock_db
+    mock_db.query.return_value.get.return_value = None
+
+    set_active_user(999)
+
+    mock_db.commit.assert_not_called()
+
+
+@patch("app.worker.r")
+@patch("app.worker.fr_controller")
+@patch("app.worker.set_active_user")
+def test_process_frames_unknown_face(mock_set_active, mock_fr, mock_redis, blank_jpeg):
+    """Worker does not activate anyone when the detected face is unrecognized."""
+    mock_redis.brpop.side_effect = [("frame_queue", blank_jpeg), SystemExit(0)]
+    mock_fr.recognize_faces.return_value = {
+        "user_ids": [0],
+        "face_locations": [[10, 10, 50, 50]],
+        "confidence_scores": [None],
+    }
+
+    with pytest.raises(SystemExit):
+        process_frames()
+
+    mock_set_active.assert_not_called()
+
+
+@patch("app.worker.r")
+@patch("app.worker.fr_controller")
+@patch("app.worker.set_active_user")
+def test_process_frames_multiple_known_users(mock_set_active, mock_fr, mock_redis, blank_jpeg):
+    """Worker skips activation when multiple known users appear in one frame."""
+    mock_redis.brpop.side_effect = [("frame_queue", blank_jpeg), SystemExit(0)]
+    mock_fr.recognize_faces.return_value = {
+        "user_ids": [1, 2],
+        "face_locations": [[10, 10, 50, 50], [60, 60, 100, 100]],
+        "confidence_scores": [90.0, 85.0],
+    }
+
+    with pytest.raises(SystemExit):
+        process_frames()
+
+    mock_set_active.assert_not_called()
+
+
+@patch("app.worker.r")
+@patch("app.worker.fr_controller")
+@patch("app.worker.set_active_user")
+def test_process_frames_invalid_image(mock_set_active, mock_fr, mock_redis):
+    """Worker skips recognition when the frame cannot be decoded."""
+    mock_redis.brpop.side_effect = [("frame_queue", b"not_an_image"), SystemExit(0)]
+
+    with pytest.raises(SystemExit):
+        process_frames()
+
+    mock_fr.recognize_faces.assert_not_called()
+    mock_set_active.assert_not_called()

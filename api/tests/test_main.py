@@ -1,6 +1,10 @@
 import pytest
 from unittest.mock import patch, MagicMock
 
+# ---------------------------------------------------------------------------
+# Existing tests
+# ---------------------------------------------------------------------------
+
 def test_add_user(client):
     """
     Tests creating a new user and verifying its details.
@@ -73,3 +77,89 @@ def test_add_drink_to_active_user(client):
     drinker = next(u for u in users if u["id"] == user["id"])
     assert len(drinker["drinks"]) == 1
     assert drinker["drinks"][0]["quantity"] == 500.0
+
+
+# ---------------------------------------------------------------------------
+# New tests
+# ---------------------------------------------------------------------------
+
+def test_add_user_already_exists(client):
+    """Adding the same user twice returns the existing record without duplicating."""
+    r1 = client.post("/adduser", json={"name": "Dup", "email": "d@ex.com", "nickname": "d"})
+    r2 = client.post("/adduser", json={"name": "Dup", "email": "d@ex.com", "nickname": "d"})
+    assert r2.status_code == 200
+    assert r2.json()["id"] == r1.json()["id"]
+    users = client.get("/users").json()
+    assert len([u for u in users if u["name"] == "Dup"]) == 1
+
+
+def test_get_active_user(client):
+    """GET /user/active returns the currently active user."""
+    user = client.post("/adduser", json={"name": "ActiveOne", "email": "a@ex.com", "nickname": "a"}).json()
+    client.put(f"/user/active/{user['id']}")
+    response = client.get("/user/active")
+    assert response.status_code == 200
+    assert response.json()["id"] == user["id"]
+
+
+def test_get_active_user_when_none(client):
+    """GET /user/active returns null when no user is active."""
+    response = client.get("/user/active")
+    assert response.status_code == 200
+    assert response.json() is None
+
+
+def test_get_user_by_name(client):
+    """GET /user/{name} returns the correct user."""
+    client.post("/adduser", json={"name": "ByName", "email": "n@ex.com", "nickname": "bn"})
+    response = client.get("/user/ByName")
+    assert response.status_code == 200
+    assert response.json()["name"] == "ByName"
+
+
+def test_get_drinks(client):
+    """GET /drinks returns all recorded drinks."""
+    user = client.post("/adduser", json={"name": "Drinker2", "email": "d2@ex.com", "nickname": "d2"}).json()
+    client.put(f"/user/active/{user['id']}")
+    client.post("/addDrinkToActiveUser", json={"quantity": 330.0})
+    client.post("/addDrinkToActiveUser", json={"quantity": 500.0})
+    response = client.get("/drinks")
+    assert response.status_code == 200
+    assert len(response.json()) == 2
+
+
+def test_add_drink(client):
+    """POST /addDrink assigns a drink directly to a specified user."""
+    user = client.post("/adduser", json={"name": "DirectDrinker", "email": "dd@ex.com", "nickname": "dd"}).json()
+    response = client.post("/addDrink", json={"user_id": user["id"], "quantity": 250.0})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["user_id"] == user["id"]
+    assert data["quantity"] == 250.0
+
+
+def test_add_drink_to_active_user_no_active(client):
+    """POST /addDrinkToActiveUser returns 400 when no user is active."""
+    response = client.post("/addDrinkToActiveUser", json={"quantity": 500.0})
+    assert response.status_code == 400
+
+
+def test_set_active_user_nonexistent(client):
+    """PUT /user/active/{id} with an unknown ID returns null without error."""
+    response = client.put("/user/active/99999")
+    assert response.status_code == 200
+    assert response.json() is None
+
+
+def test_record_face(client):
+    """POST /recordFace switches the app into CAPTURE mode."""
+    response = client.post("/recordFace?id=1")
+    assert response.status_code == 200
+    assert response.json()["app_mode"] == 1  # AppModes.CAPTURE
+
+
+def test_detect_face(client):
+    """POST /detectFace switches the app back into DETECT mode."""
+    response = client.post("/detectFace")
+    assert response.status_code == 200
+    assert response.json()["app_mode"] == 2  # AppModes.DETECT
