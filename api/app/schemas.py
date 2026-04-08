@@ -33,10 +33,32 @@ class UserUpdateSchema(BaseModel):
 class DrinksSchemaFull(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    user_id: int
+    user_id: Optional[int]
     timestamp: datetime
     id: int
     quantity: float
+
+
+class DrinkWithUser(BaseModel):
+    """Drink record enriched with the owner's name — used for the paginated history endpoint."""
+    id: int
+    user_id: Optional[int] = None
+    user_name: Optional[str] = None
+    timestamp: datetime
+    quantity: float
+
+
+class PaginatedDrinks(BaseModel):
+    items: List[DrinkWithUser]
+    total: int
+    page: int
+    limit: int
+    pages: int
+
+
+class DrinkUpdateSchema(BaseModel):
+    user_id: Optional[int] = None
+    quantity: Optional[float] = None
 
 
 class UserResponse(BaseModel):

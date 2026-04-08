@@ -11,7 +11,7 @@ from fastapi import FastAPI, Depends, HTTPException, WebSocket, WebSocketDisconn
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from app.models import Base, User, Drinks
-from app.schemas import UserSchema, DrinksSchema, DrinkQuantitySchema, UserResponse, UserWithDrinks, UserUpdateSchema
+from app.schemas import UserSchema, DrinksSchema, DrinkQuantitySchema, UserResponse, UserWithDrinks, UserUpdateSchema, PaginatedDrinks, DrinkWithUser, DrinkUpdateSchema
 from app.database import engine, SessionLocal
 from pydantic import BaseModel
 import ssl
@@ -185,10 +185,41 @@ async def delete_user(id: int, db: Session = Depends(get_db)):
     logger.info(f"User deleted: ID={id}")
 
 
-@app.get("/drinks")
-async def get_drinks(db: Session = Depends(get_db)):
-    users = db.query(Drinks).all()
-    return users
+@app.get("/drinks", response_model=PaginatedDrinks)
+async def get_drinks(page: int = 1, limit: int = 20, db: Session = Depends(get_db)):
+    query = db.query(Drinks).order_by(Drinks.timestamp.desc())
+    total = query.count()
+    offset = (page - 1) * limit
+    rows = query.offset(offset).limit(limit).all()
+    pages = max(1, (total + limit - 1) // limit)
+    items = [
+        DrinkWithUser(
+            id=d.id,
+            user_id=d.user_id,
+            user_name=d.user.name if d.user else None,
+            timestamp=d.timestamp,
+            quantity=d.quantity,
+        )
+        for d in rows
+    ]
+    return PaginatedDrinks(items=items, total=total, page=page, limit=limit, pages=pages)
+
+@app.patch("/drink/{id}")
+async def update_drink(id: int, request: DrinkUpdateSchema, db: Session = Depends(get_db)):
+    drink = db.get(Drinks, id)
+    if not drink:
+        raise HTTPException(status_code=404, detail="Drink not found")
+    if request.user_id is not None:
+        user = db.get(User, request.user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        drink.user_id = request.user_id
+    if request.quantity is not None:
+        drink.quantity = request.quantity
+    db.commit()
+    db.refresh(drink)
+    logger.info(f"Drink updated: ID={id}, user_id={drink.user_id}, quantity={drink.quantity}")
+    return drink
 
 @app.post("/addDrink")
 async def add_drink(request:DrinksSchema, db: Session = Depends(get_db)):

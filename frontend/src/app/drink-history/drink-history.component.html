@@ -1,0 +1,48 @@
+<main class="history-main">
+  <h1>Drink History</h1>
+  <p class="subtitle">{{ total }} records total — showing page {{ page }} of {{ totalPages }}</p>
+
+  <table class="drinks-table">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Timestamp</th>
+        <th>User</th>
+        <th>Quantity (ml)</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let drink of drinks" [class.dirty]="drink.dirty">
+        <td>{{ drink.id }}</td>
+        <td>{{ drink.timestamp | date:'yyyy-MM-dd HH:mm:ss' }}</td>
+        <td>
+          <select class="cell-select" [(ngModel)]="drink.editUserId" (ngModelChange)="markDirty(drink)">
+            <option [ngValue]="null">— unassigned —</option>
+            <option *ngFor="let u of users" [ngValue]="u.id">{{ u.name }}</option>
+          </select>
+        </td>
+        <td>
+          <input class="cell-input" type="number" min="0" step="1"
+            [(ngModel)]="drink.editQuantity" (ngModelChange)="markDirty(drink)" />
+        </td>
+        <td>
+          <button class="btn btn-confirm" [disabled]="!drink.dirty || drink.saving"
+            (click)="confirm(drink)">
+            {{ drink.saving ? 'Saving…' : 'Confirm' }}
+          </button>
+        </td>
+      </tr>
+
+      <tr *ngIf="drinks.length === 0">
+        <td colspan="5" class="empty">No drink records found.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="pagination">
+    <button class="btn btn-page" [disabled]="page <= 1" (click)="prevPage()">← Previous</button>
+    <span>Page {{ page }} / {{ totalPages }}</span>
+    <button class="btn btn-page" [disabled]="page >= totalPages" (click)="nextPage()">Next →</button>
+  </div>
+</main>

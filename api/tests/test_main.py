@@ -118,14 +118,16 @@ def test_get_user_by_name(client):
 
 
 def test_get_drinks(client):
-    """GET /drinks returns all recorded drinks."""
+    """GET /drinks returns a paginated response with recorded drinks."""
     user = client.post("/adduser", json={"name": "Drinker2", "email": "d2@ex.com", "nickname": "d2"}).json()
     client.put(f"/user/active/{user['id']}")
     client.post("/addDrinkToActiveUser", json={"quantity": 330.0})
     client.post("/addDrinkToActiveUser", json={"quantity": 500.0})
     response = client.get("/drinks")
     assert response.status_code == 200
-    assert len(response.json()) == 2
+    data = response.json()
+    assert data["total"] == 2
+    assert len(data["items"]) == 2
 
 
 def test_add_drink(client):
@@ -213,6 +215,88 @@ def test_delete_user_not_found(client):
     assert response.status_code == 404
 
 
+# ---------------------------------------------------------------------------
+# Issue #3: Drink history page
+# ---------------------------------------------------------------------------
+
+def test_get_drinks_paginated(client):
+    """GET /drinks supports pagination and returns most recent first."""
+    user = client.post("/adduser", json={"name": "PagUser", "email": "p@ex.com", "nickname": "p"}).json()
+    client.put(f"/user/active/{user['id']}")
+    for qty in [100.0, 200.0, 300.0]:
+        client.post("/addDrinkToActiveUser", json={"quantity": qty})
+
+    page1 = client.get("/drinks?page=1&limit=2").json()
+    assert page1["total"] == 3
+    assert page1["pages"] == 2
+    assert len(page1["items"]) == 2
+
+    page2 = client.get("/drinks?page=2&limit=2").json()
+    assert len(page2["items"]) == 1
+
+
+def test_get_drinks_includes_user_name(client):
+    """GET /drinks includes the user name in each record."""
+    user = client.post("/adduser", json={"name": "NamedDrinker", "email": "n@ex.com", "nickname": "nd"}).json()
+    client.put(f"/user/active/{user['id']}")
+    client.post("/addDrinkToActiveUser", json={"quantity": 250.0})
+
+    data = client.get("/drinks").json()
+    assert data["items"][0]["user_name"] == "NamedDrinker"
+
+
+def test_get_drinks_ordered_most_recent_first(client):
+    """GET /drinks returns drinks ordered by timestamp descending."""
+    user = client.post("/adduser", json={"name": "OrderUser", "email": "o@ex.com", "nickname": "ou"}).json()
+    client.put(f"/user/active/{user['id']}")
+    client.post("/addDrinkToActiveUser", json={"quantity": 111.0})
+    client.post("/addDrinkToActiveUser", json={"quantity": 222.0})
+    client.post("/addDrinkToActiveUser", json={"quantity": 333.0})
+
+    items = client.get("/drinks").json()["items"]
+    quantities = [i["quantity"] for i in items]
+    assert quantities == [333.0, 222.0, 111.0]
+
+
+def test_update_drink_quantity(client):
+    """PATCH /drink/{id} updates the quantity of a drink."""
+    user = client.post("/adduser", json={"name": "DQUser", "email": "dq@ex.com", "nickname": "dq"}).json()
+    client.put(f"/user/active/{user['id']}")
+    drink = client.post("/addDrinkToActiveUser", json={"quantity": 400.0}).json()
+
+    response = client.patch(f"/drink/{drink['id']}", json={"quantity": 550.0})
+    assert response.status_code == 200
+    assert response.json()["quantity"] == 550.0
+
+
+def test_update_drink_user(client):
+    """PATCH /drink/{id} reassigns a drink to a different user."""
+    u1 = client.post("/adduser", json={"name": "DU1", "email": "du1@ex.com", "nickname": "du1"}).json()
+    u2 = client.post("/adduser", json={"name": "DU2", "email": "du2@ex.com", "nickname": "du2"}).json()
+    client.put(f"/user/active/{u1['id']}")
+    drink = client.post("/addDrinkToActiveUser", json={"quantity": 300.0}).json()
+
+    response = client.patch(f"/drink/{drink['id']}", json={"user_id": u2["id"]})
+    assert response.status_code == 200
+    assert response.json()["user_id"] == u2["id"]
+
+
+def test_update_drink_not_found(client):
+    """PATCH /drink/{id} returns 404 for a non-existent drink."""
+    response = client.patch("/drink/99999", json={"quantity": 100.0})
+    assert response.status_code == 404
+
+
+def test_update_drink_invalid_user(client):
+    """PATCH /drink/{id} returns 404 when reassigning to a non-existent user."""
+    user = client.post("/adduser", json={"name": "IUUser", "email": "iu@ex.com", "nickname": "iu"}).json()
+    client.put(f"/user/active/{user['id']}")
+    drink = client.post("/addDrinkToActiveUser", json={"quantity": 200.0}).json()
+
+    response = client.patch(f"/drink/{drink['id']}", json={"user_id": 99999})
+    assert response.status_code == 404
+
+
 def test_delete_user_drinks_preserved(client):
     """Drinks belonging to a deleted user are kept (no cascade delete)."""
     user = client.post("/adduser", json={"name": "DrinkOwner", "email": "do@ex.com", "nickname": "do"}).json()
@@ -221,5 +305,5 @@ def test_delete_user_drinks_preserved(client):
 
     client.delete(f"/user/{user['id']}")
 
-    drinks = client.get("/drinks").json()
+    drinks = client.get("/drinks").json()["items"]
     assert any(d["user_id"] == user["id"] for d in drinks)

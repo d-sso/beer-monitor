@@ -4,6 +4,22 @@ import { Drinker } from './shared/drinker';
 import { Observable } from 'rxjs';
 import { PlatformLocation } from '@angular/common';
 
+export interface DrinkRecord {
+  id: number;
+  user_id: number | null;
+  user_name: string | null;
+  timestamp: string;
+  quantity: number;
+}
+
+export interface PaginatedDrinks {
+  items: DrinkRecord[];
+  total: number;
+  page: number;
+  limit: number;
+  pages: number;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -37,5 +53,13 @@ export class DrinksService {
 
   recordFace(id: number): Observable<any> {
     return this.http.post(`${this.base_url}/recordFace?id=${id}`, null);
+  }
+
+  getDrinksPage(page: number = 1, limit: number = 20): Observable<PaginatedDrinks> {
+    return this.http.get<PaginatedDrinks>(`${this.base_url}/drinks?page=${page}&limit=${limit}`);
+  }
+
+  updateDrink(id: number, data: { user_id?: number | null; quantity?: number }): Observable<any> {
+    return this.http.patch(`${this.base_url}/drink/${id}`, data);
   }
 }
