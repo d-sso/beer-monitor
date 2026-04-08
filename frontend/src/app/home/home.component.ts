@@ -14,6 +14,12 @@ interface DetectApp{
   user_id: Number;
 }
 
+interface LatestDrink {
+  user_name: string | null;
+  quantity: number;
+  timestamp: string;
+}
+
 @Component({
   selector: 'app-home',
   standalone: true,
@@ -31,6 +37,7 @@ export class HomeComponent {
   editing = false;
   recognizedFaces:Array<Array<number>> = [];
   webCamArea:HTMLCanvasElement | null = null;
+  latestDrinks: LatestDrink[] = [];
 
   wsSubject = webSocket(
     {
@@ -72,6 +79,8 @@ export class HomeComponent {
       next: (msg) => {
         if(typeof msg === "object" && msg && "faces" in msg)
           this.recognizedFaces = msg['faces'] as Array<Array<number>>;
+        if(typeof msg === "object" && msg && "latest_drinks" in msg)
+          this.latestDrinks = msg['latest_drinks'] as LatestDrink[];
         if(!this.webCamArea){
           this.webCamArea = document.getElementById("face-canvas") as HTMLCanvasElement;
           this.webCamArea.height = this.webCamArea.clientHeight;

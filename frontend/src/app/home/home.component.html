@@ -19,6 +19,17 @@
       Active user: {{getActiveUser()}}
     </h2>
 
+    <div class="latest-drinks" *ngIf="latestDrinks.length > 0">
+      <h3>Latest drinks</h3>
+      <ul class="latest-list">
+        <li *ngFor="let d of latestDrinks" class="latest-item">
+          <span class="latest-name">{{ d.user_name || 'Unknown' }}</span>
+          <span class="latest-qty">{{ (d.quantity / 1000) | number:'1.2-2' }} L</span>
+          <span class="latest-time">{{ d.timestamp | date:'HH:mm:ss' }}</span>
+        </li>
+      </ul>
+    </div>
+
     <ul>
       <li *ngFor="let drinker of drinkers">
         <app-item (remove)="remove(drinker)" [item]="drinker" (editing)="editableToggle($event)"></app-item>

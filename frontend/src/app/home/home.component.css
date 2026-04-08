@@ -46,3 +46,55 @@ ul {
 ul li {
   list-style: none;
 }
+
+.latest-drinks {
+  margin: 1rem 0;
+  padding: 0.75rem 1rem;
+  background: #f0f4ff;
+  border-radius: 6px;
+  text-align: left;
+}
+
+.latest-drinks h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+  color: #444;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.latest-list {
+  padding: 0;
+  margin: 0;
+}
+
+.latest-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.2rem 0;
+  font-size: 0.9rem;
+  border-bottom: 1px solid #dde3f5;
+}
+
+.latest-item:last-child {
+  border-bottom: none;
+}
+
+.latest-name {
+  font-weight: 600;
+  flex: 1;
+}
+
+.latest-qty {
+  color: #333;
+  min-width: 60px;
+  text-align: right;
+}
+
+.latest-time {
+  color: #888;
+  min-width: 70px;
+  text-align: right;
+  margin-left: 1rem;
+  font-size: 0.8rem;
+}

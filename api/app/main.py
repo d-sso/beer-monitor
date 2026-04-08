@@ -11,6 +11,7 @@ from fastapi import FastAPI, Depends, HTTPException, WebSocket, WebSocketDisconn
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from app.models import Base, User, Drinks
+from sqlalchemy.orm import selectinload
 from app.schemas import UserSchema, DrinksSchema, DrinkQuantitySchema, UserResponse, UserWithDrinks, UserUpdateSchema, PaginatedDrinks, DrinkWithUser, DrinkUpdateSchema
 from app.database import engine, SessionLocal
 from pydantic import BaseModel
@@ -41,14 +42,20 @@ class DetectApp(BaseModel):
 
 asyncState = DetectApp(n_images = 10, saved_images=0, app_mode=AppModes.DETECT,user_id=1)
 
+class LatestDrink(BaseModel):
+    user_name: Optional[str] = None
+    quantity: float
+    timestamp: str
+
 class Faces(BaseModel):
-    """ This is a pydantic model to define the structure of the streaming data 
+    """ This is a pydantic model to define the structure of the streaming data
     that we will be sending the the cv2 Classifier to make predictions
     It expects a List of a Tuple of 4 integers
     """
     faces: List[Tuple[int, int, int, int]]
     detected_face: List[int]
     app_state: DetectApp
+    latest_drinks: List[LatestDrink] = []
 
 ### END todo
 Base.metadata.create_all(bind=engine)
@@ -228,6 +235,7 @@ async def add_drink(request:DrinksSchema, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(drink)
     logger.info(f"Drink added: {request.quantity:.1f}ml for user_id={request.user_id} (drink_id={drink.id})")
+    _write_latest_drinks(db)
     return drink
 
 @app.post("/addDrinkToActiveUser")
@@ -241,6 +249,7 @@ async def add_drink_to_active(request:DrinkQuantitySchema, db: Session = Depends
     db.commit()
     db.refresh(drink)
     logger.info(f"Drink added: {request.quantity:.1f}ml for '{currentActive.name}' (user_id={currentActive.id}, drink_id={drink.id})")
+    _write_latest_drinks(db)
     return drink
 
 
@@ -257,6 +266,22 @@ def _write_app_state():
         r.set('app_state', asyncState.model_dump_json())
     except Exception as e:
         logger.warning(f"Could not write app state to Redis: {e}")
+
+def _write_latest_drinks(db: Session):
+    """Write the 5 most recent drinks (with user name) to Redis for the WebSocket tick."""
+    try:
+        rows = db.query(Drinks).options(selectinload(Drinks.user)).order_by(Drinks.timestamp.desc()).limit(5).all()
+        data = [
+            {
+                "user_name": d.user.name if d.user else None,
+                "quantity": d.quantity,
+                "timestamp": d.timestamp.isoformat() if d.timestamp else None,
+            }
+            for d in rows
+        ]
+        r.set('latest_drinks', json.dumps(data))
+    except Exception as e:
+        logger.warning(f"Could not write latest drinks to Redis: {e}")
 
 ### SECTION for handling the web sockets and images
 async def receive(websocket: WebSocket):
@@ -299,13 +324,19 @@ async def detect(websocket: WebSocket, async_state: any):
                 async_state.saved_images = state['saved_images']
                 async_state.user_id = state['user_id']
 
+            latest_drinks: List[LatestDrink] = []
+            latest_drinks_data = r.get('latest_drinks')
+            if latest_drinks_data:
+                latest_drinks = [LatestDrink(**d) for d in json.loads(latest_drinks_data)]
+
             last_results = r.get('last_face_locations')
             if last_results:
                 results = json.loads(last_results)
                 faces_output = Faces(
                     faces=results.get('face_locations', []),
                     app_state=async_state,
-                    detected_face=results.get('user_ids', [])
+                    detected_face=results.get('user_ids', []),
+                    latest_drinks=latest_drinks,
                 )
                 await websocket.send_text(faces_output.model_dump_json())
 

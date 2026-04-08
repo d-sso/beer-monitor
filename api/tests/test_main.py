@@ -281,6 +281,47 @@ def test_update_drink_user(client):
     assert response.json()["user_id"] == u2["id"]
 
 
+# ---------------------------------------------------------------------------
+# Issue #4: Real-time latest drinks panel
+# ---------------------------------------------------------------------------
+
+def test_add_drink_writes_latest_drinks_to_redis(client):
+    """POST /addDrink writes the 5 most recent drinks to Redis latest_drinks."""
+    user = client.post("/adduser", json={"name": "RedisUser", "email": "r@ex.com", "nickname": "ru"}).json()
+    mock_redis = MagicMock()
+
+    import app.main as main_module
+    original_r = main_module.r
+    main_module.r = mock_redis
+
+    try:
+        client.post("/addDrink", json={"user_id": user["id"], "quantity": 300.0})
+        mock_redis.set.assert_called()
+        call_args = [str(c) for c in mock_redis.set.call_args_list]
+        assert any('latest_drinks' in c for c in call_args)
+    finally:
+        main_module.r = original_r
+
+
+def test_add_drink_to_active_writes_latest_drinks_to_redis(client):
+    """POST /addDrinkToActiveUser writes the 5 most recent drinks to Redis latest_drinks."""
+    user = client.post("/adduser", json={"name": "RedisUser2", "email": "r2@ex.com", "nickname": "ru2"}).json()
+    client.put(f"/user/active/{user['id']}")
+    mock_redis = MagicMock()
+
+    import app.main as main_module
+    original_r = main_module.r
+    main_module.r = mock_redis
+
+    try:
+        client.post("/addDrinkToActiveUser", json={"quantity": 400.0})
+        mock_redis.set.assert_called()
+        call_args = [str(c) for c in mock_redis.set.call_args_list]
+        assert any('latest_drinks' in c for c in call_args)
+    finally:
+        main_module.r = original_r
+
+
 def test_update_drink_not_found(client):
     """PATCH /drink/{id} returns 404 for a non-existent drink."""
     response = client.patch("/drink/99999", json={"quantity": 100.0})
