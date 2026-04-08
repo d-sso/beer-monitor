@@ -1,4 +1,5 @@
 paho-mqtt
 requests
+redis
 pytest
 pytest-mock

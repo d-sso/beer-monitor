@@ -68,5 +68,7 @@ services:
       - API_URL=https://api:443/drinks
       - MQTT_SERVER=${MQTT_SERVER}
       - MQTT_PORT=${MQTT_PORT:-1883}
+      - REDIS_URL=redis://redis:6379/0
     depends_on:
       - api
+      - redis

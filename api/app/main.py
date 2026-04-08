@@ -56,6 +56,7 @@ class Faces(BaseModel):
     detected_face: List[int]
     app_state: DetectApp
     latest_drinks: List[LatestDrink] = []
+    current_pour: float = 0.0
 
 ### END todo
 Base.metadata.create_all(bind=engine)
@@ -329,6 +330,14 @@ async def detect(websocket: WebSocket, async_state: any):
             if latest_drinks_data:
                 latest_drinks = [LatestDrink(**d) for d in json.loads(latest_drinks_data)]
 
+            current_pour: float = 0.0
+            current_pour_data = r.get('current_pour')
+            if current_pour_data:
+                try:
+                    current_pour = float(current_pour_data)
+                except (ValueError, TypeError):
+                    pass
+
             last_results = r.get('last_face_locations')
             if last_results:
                 results = json.loads(last_results)
@@ -337,6 +346,7 @@ async def detect(websocket: WebSocket, async_state: any):
                     app_state=async_state,
                     detected_face=results.get('user_ids', []),
                     latest_drinks=latest_drinks,
+                    current_pour=current_pour,
                 )
                 await websocket.send_text(faces_output.model_dump_json())
 

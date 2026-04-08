@@ -38,6 +38,8 @@ export class HomeComponent {
   recognizedFaces:Array<Array<number>> = [];
   webCamArea:HTMLCanvasElement | null = null;
   latestDrinks: LatestDrink[] = [];
+  currentPour: number = 0;
+  readonly POUR_MAX_ML = 600;
 
   wsSubject = webSocket(
     {
@@ -81,6 +83,8 @@ export class HomeComponent {
           this.recognizedFaces = msg['faces'] as Array<Array<number>>;
         if(typeof msg === "object" && msg && "latest_drinks" in msg)
           this.latestDrinks = msg['latest_drinks'] as LatestDrink[];
+        if(typeof msg === "object" && msg && "current_pour" in msg)
+          this.currentPour = msg['current_pour'] as number;
         if(!this.webCamArea){
           this.webCamArea = document.getElementById("face-canvas") as HTMLCanvasElement;
           this.webCamArea.height = this.webCamArea.clientHeight;
@@ -194,6 +198,10 @@ export class HomeComponent {
       return drinker[0].name;
     else
       return "";
+  }
+
+  pourPercent(): number {
+    return Math.min(100, (this.currentPour / this.POUR_MAX_ML) * 100);
   }
 
   get drinkers() {

@@ -19,6 +19,16 @@
       Active user: {{getActiveUser()}}
     </h2>
 
+    <div class="pour-gauge">
+      <div class="gauge-label">Pouring: {{ currentPour | number:'1.0-0' }} ml</div>
+      <div class="gauge-track">
+        <div class="gauge-fill" [style.width.%]="pourPercent()"></div>
+      </div>
+      <div class="gauge-scale">
+        <span>0</span><span>150</span><span>300</span><span>450</span><span>600 ml</span>
+      </div>
+    </div>
+
     <div class="latest-drinks" *ngIf="latestDrinks.length > 0">
       <h3>Latest drinks</h3>
       <ul class="latest-list">

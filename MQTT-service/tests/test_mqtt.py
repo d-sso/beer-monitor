@@ -79,3 +79,42 @@ def test_on_message_invalid_payload(mock_timer):
 
     mock_timer.cancel.assert_called_once()
     mock_timer.start.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Issue #5: Real-time pour gauge — Redis writes
+# ---------------------------------------------------------------------------
+
+@patch("MQTTRead.myTimer")
+@patch("MQTTRead.r")
+def test_on_message_writes_current_pour_to_redis(mock_r, mock_timer):
+    """on_message writes current_pour (ml) to Redis on each incoming value."""
+    msg = MagicMock()
+    msg.topic = "beer/quantity"
+    msg.payload = b"0.5"  # 0.5 kg -> 500 ml
+
+    MQTTRead.on_message(None, None, msg)
+
+    mock_r.set.assert_called_with('current_pour', 500.0)
+
+
+@patch("MQTTRead.requests.post")
+@patch("MQTTRead.r")
+def test_register_drink_resets_current_pour(mock_r, mock_post):
+    """register_drink resets current_pour to 0 in Redis after committing the drink."""
+    mock_post.return_value.status_code = 200
+
+    MQTTRead.register_drink(500.0)
+
+    mock_r.set.assert_called_with('current_pour', 0)
+
+
+@patch("MQTTRead.requests.post")
+@patch("MQTTRead.r")
+def test_register_drink_resets_current_pour_even_on_error(mock_r, mock_post):
+    """register_drink resets current_pour even when the HTTP POST fails."""
+    mock_post.side_effect = Exception("connection refused")
+
+    MQTTRead.register_drink(300.0)
+
+    mock_r.set.assert_called_with('current_pour', 0)

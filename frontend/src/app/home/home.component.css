@@ -47,6 +47,40 @@ ul li {
   list-style: none;
 }
 
+.pour-gauge {
+  margin: 1rem 0;
+  text-align: left;
+}
+
+.gauge-label {
+  font-size: 0.85rem;
+  color: #555;
+  margin-bottom: 0.3rem;
+}
+
+.gauge-track {
+  height: 22px;
+  background: #e0e0e0;
+  border-radius: 11px;
+  overflow: hidden;
+}
+
+.gauge-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #f5a623, #e53935);
+  border-radius: 11px;
+  transition: width 0.3s ease;
+  min-width: 0;
+}
+
+.gauge-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  color: #999;
+  margin-top: 0.2rem;
+}
+
 .latest-drinks {
   margin: 1rem 0;
   padding: 0.75rem 1rem;

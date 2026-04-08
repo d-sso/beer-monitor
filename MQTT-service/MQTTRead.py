@@ -3,6 +3,7 @@ import requests
 import os
 import logging
 from threading import Timer
+import redis
 
 logging.basicConfig(
     level=logging.INFO,
@@ -22,6 +23,23 @@ PASSWORD = os.environ.get('MQTT_PASSWORD', secrets.get('password', ''))
 api_url = os.environ.get('API_URL', secrets.get('api_url', 'http://api/drinks'))
 mqtt_server = os.environ.get('MQTT_SERVER', secrets.get('mqtt_server', 'localhost'))
 mqtt_port = int(os.environ.get('MQTT_PORT', secrets.get('mqtt_port', 1883)))
+redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+
+r = redis.from_url(redis_url)
+
+def _write_current_pour(value_ml: float):
+    """Write the current in-progress pour value (ml) to Redis."""
+    try:
+        r.set('current_pour', value_ml)
+    except Exception as e:
+        logger.warning(f"Could not write current_pour to Redis: {e}")
+
+def _reset_current_pour():
+    """Reset the pour gauge to 0 after a drink is committed."""
+    try:
+        r.set('current_pour', 0)
+    except Exception as e:
+        logger.warning(f"Could not reset current_pour in Redis: {e}")
 
 def register_drink(value):
     logger.info(f"Registering drink: {value:.1f}ml -> POST {api_url}")
@@ -30,6 +48,8 @@ def register_drink(value):
         logger.info(f"Drink registration response: HTTP {response.status_code}")
     except Exception as e:
         logger.error(f"Failed to register drink ({value:.1f}ml): {e}")
+    finally:
+        _reset_current_pour()
 
 def delay_register(value):
     global myTimer
@@ -58,6 +78,7 @@ def on_message(client, userdata, msg):
     myTimer.cancel()
     try:
         quantity_ml = float(raw_value) * 1000
+        _write_current_pour(quantity_ml)
         delay_register(quantity_ml)
         myTimer.start()
     except Exception as e:
