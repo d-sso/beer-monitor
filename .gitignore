@@ -39,3 +39,25 @@ api/beer.db
 api/saved_encodings
 venv/
 beer.db
+
+# Claude Code context (contains project-specific instructions, keep local)
+CLAUDE.md
+
+# SSL certificates
+api/certificate/
+*.pem
+*.key
+*.crt
+*.cert
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.env
+local_secrets.py
+
+# Node / Angular
+node_modules/
+dist/
+.angular/
