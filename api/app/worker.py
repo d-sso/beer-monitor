@@ -6,8 +6,8 @@ import cv2
 import numpy as np
 import logging
 from app.face_recognition_control import face_recognition_controller
-from app.database import SessionLocal
-from app.models import User
+from app.database import SessionLocal, engine
+from app.models import Base, User
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -16,6 +16,9 @@ logger = logging.getLogger("worker")
 # Redis configuration
 redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
 r = redis.from_url(redis_url)
+
+# Ensure tables exist (in case the worker starts before the API)
+Base.metadata.create_all(bind=engine)
 
 # Initialize face recognition controller
 fr_controller = face_recognition_controller(logger)

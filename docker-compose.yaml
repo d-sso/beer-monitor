@@ -9,19 +9,20 @@ services:
   api:
     container_name: fastapi-beer
     restart: always
-    build: 
+    build:
       context: "api"
       dockerfile: "Dockerfile"
+    command: uvicorn app.main:app --host 0.0.0.0 --port 443 --ssl-certfile /code/certificate/cert.pem --ssl-keyfile /code/certificate/key.pem
     ports:
-      - "8000:80"
+      - "8000:443"
     environment:
       - REDIS_URL=redis://redis:6379/0
-      - DATABASE_URL=sqlite:///./beer.db
+      - DATABASE_URL=sqlite:////data/beer.db
       - IMAGES_PATH=/data/imgs
       - MODEL_PATH=/data/saved_encodings
     volumes:
       - ./api/data:/data
-      - ./api/certificate:/code/certificate
+      - ./api/certificate:/code/certificate:ro
     depends_on:
       - redis
 
@@ -34,7 +35,7 @@ services:
     command: python -m app.worker
     environment:
       - REDIS_URL=redis://redis:6379/0
-      - DATABASE_URL=sqlite:///./beer.db
+      - DATABASE_URL=sqlite:////data/beer.db
       - IMAGES_PATH=/data/imgs
       - MODEL_PATH=/data/saved_encodings
     volumes:
@@ -45,13 +46,15 @@ services:
   frontend:
     container_name: frontend-beer
     restart: always
-    build: 
+    build:
       context: "frontend"
       dockerfile: "docker/Dockerfile"
     depends_on:
       - api
     ports:
-      - "8080:80"
+      - "8080:443"
+    volumes:
+      - ./api/certificate:/etc/nginx/certs:ro
   mqtt-service:
     container_name: mqtt-beer
     restart: always
@@ -59,11 +62,11 @@ services:
       context: "MQTT-service"
       dockerfile: "Dockerfile"
     environment:
-      - MQTT_TARGET_TOPIC=beer/quantity
-      - MQTT_USERNAME=your_username
-      - MQTT_PASSWORD=your_password
-      - API_URL=http://api:80/drinks
-      - MQTT_SERVER=homeassistant.local
-      - MQTT_PORT=1883
+      - MQTT_TARGET_TOPIC=${MQTT_TARGET_TOPIC:-beer/quantity}
+      - MQTT_USERNAME=${MQTT_USERNAME}
+      - MQTT_PASSWORD=${MQTT_PASSWORD}
+      - API_URL=https://api:443/drinks
+      - MQTT_SERVER=${MQTT_SERVER}
+      - MQTT_PORT=${MQTT_PORT:-1883}
     depends_on:
       - api
