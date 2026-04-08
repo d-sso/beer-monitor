@@ -11,7 +11,7 @@ from fastapi import FastAPI, Depends, HTTPException, WebSocket, WebSocketDisconn
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from app.models import Base, User, Drinks
-from app.schemas import UserSchema, DrinksSchema, DrinkQuantitySchema,UserWithDrinks
+from app.schemas import UserSchema, DrinksSchema, DrinkQuantitySchema, UserResponse, UserWithDrinks
 from app.database import engine, SessionLocal
 from pydantic import BaseModel
 import ssl
@@ -19,7 +19,7 @@ import ssl
 from sqlalchemy.orm import Session,selectinload
 import logging
 
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 from enum import Enum
 
 import base64
@@ -102,7 +102,7 @@ def get_db():
 #async def root():
     #return {"message": "Hello World"}
 
-@app.post("/adduser")
+@app.post("/adduser", response_model=UserResponse)
 async def add_user(request:UserSchema, db: Session = Depends(get_db)):
     # check if user already exists
     user = db.query(User).filter(User.name == request.name).first()
@@ -125,12 +125,12 @@ async def add_user(request:UserSchema, db: Session = Depends(get_db)):
 
     return user
 
-@app.get("/users")
+@app.get("/users", response_model=List[UserWithDrinks])
 async def get_users(db: Session = Depends(get_db)):
     users = db.query(User).options(selectinload(User.drinks)).all()
     return users
 
-@app.get("/user/active")
+@app.get("/user/active", response_model=Optional[UserResponse])
 async def get_active_user(db: Session = Depends(get_db)):
     user = db.query(User).filter(User.active == True).first()
     return user
@@ -150,11 +150,11 @@ async def set_active_user(id,db: Session):
         logger.debug(f"set_active_user: user '{getattr(user, 'name', id)}' already active or not found")
     return user
 
-@app.put("/user/active/{id}")
+@app.put("/user/active/{id}", response_model=Optional[UserResponse])
 async def endpoint_set_active_user(id,db: Session = Depends(get_db)):
     return await set_active_user(id,db)
 
-@app.get("/user/{user_name}")
+@app.get("/user/{user_name}", response_model=Optional[UserResponse])
 async def get_users(user_name, db: Session = Depends(get_db)):
     users = db.query(User).filter(User.name == user_name).first()
     return users
