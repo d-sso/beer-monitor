@@ -163,3 +163,63 @@ def test_detect_face(client):
     response = client.post("/detectFace")
     assert response.status_code == 200
     assert response.json()["app_mode"] == 2  # AppModes.DETECT
+
+
+# ---------------------------------------------------------------------------
+# Issue #2: User management CRUD
+# ---------------------------------------------------------------------------
+
+def test_update_user_name(client):
+    """PATCH /user/{id} updates the user's name."""
+    user = client.post("/adduser", json={"name": "OldName", "email": "o@ex.com", "nickname": "old"}).json()
+    response = client.patch(f"/user/{user['id']}", json={"name": "NewName"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["name"] == "NewName"
+    assert data["email"] == "o@ex.com"   # unchanged
+    assert data["nickname"] == "old"      # unchanged
+
+
+def test_update_user_email_and_nickname(client):
+    """PATCH /user/{id} can update email and nickname independently."""
+    user = client.post("/adduser", json={"name": "Sam", "email": "old@ex.com", "nickname": "s"}).json()
+    response = client.patch(f"/user/{user['id']}", json={"email": "new@ex.com", "nickname": "sammy"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["name"] == "Sam"           # unchanged
+    assert data["email"] == "new@ex.com"
+    assert data["nickname"] == "sammy"
+
+
+def test_update_user_not_found(client):
+    """PATCH /user/{id} returns 404 for a non-existent user."""
+    response = client.patch("/user/99999", json={"name": "Ghost"})
+    assert response.status_code == 404
+
+
+def test_delete_user(client):
+    """DELETE /user/{id} removes the user; subsequent GET /users excludes them."""
+    user = client.post("/adduser", json={"name": "ToDelete", "email": "d@ex.com", "nickname": "del"}).json()
+    response = client.delete(f"/user/{user['id']}")
+    assert response.status_code == 204
+
+    users = client.get("/users").json()
+    assert all(u["id"] != user["id"] for u in users)
+
+
+def test_delete_user_not_found(client):
+    """DELETE /user/{id} returns 404 for a non-existent user."""
+    response = client.delete("/user/99999")
+    assert response.status_code == 404
+
+
+def test_delete_user_drinks_preserved(client):
+    """Drinks belonging to a deleted user are kept (no cascade delete)."""
+    user = client.post("/adduser", json={"name": "DrinkOwner", "email": "do@ex.com", "nickname": "do"}).json()
+    client.put(f"/user/active/{user['id']}")
+    client.post("/addDrinkToActiveUser", json={"quantity": 500.0})
+
+    client.delete(f"/user/{user['id']}")
+
+    drinks = client.get("/drinks").json()
+    assert any(d["user_id"] == user["id"] for d in drinks)

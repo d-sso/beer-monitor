@@ -11,7 +11,7 @@ from fastapi import FastAPI, Depends, HTTPException, WebSocket, WebSocketDisconn
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from app.models import Base, User, Drinks
-from app.schemas import UserSchema, DrinksSchema, DrinkQuantitySchema, UserResponse, UserWithDrinks
+from app.schemas import UserSchema, DrinksSchema, DrinkQuantitySchema, UserResponse, UserWithDrinks, UserUpdateSchema
 from app.database import engine, SessionLocal
 from pydantic import BaseModel
 import ssl
@@ -155,9 +155,34 @@ async def endpoint_set_active_user(id,db: Session = Depends(get_db)):
     return await set_active_user(id,db)
 
 @app.get("/user/{user_name}", response_model=Optional[UserResponse])
-async def get_users(user_name, db: Session = Depends(get_db)):
+async def get_user_by_name(user_name, db: Session = Depends(get_db)):
     users = db.query(User).filter(User.name == user_name).first()
     return users
+
+@app.patch("/user/{id}", response_model=UserResponse)
+async def update_user(id: int, request: UserUpdateSchema, db: Session = Depends(get_db)):
+    user = db.get(User, id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if request.name is not None:
+        user.name = request.name
+    if request.email is not None:
+        user.email = request.email
+    if request.nickname is not None:
+        user.nickname = request.nickname
+    db.commit()
+    db.refresh(user)
+    logger.info(f"User updated: ID={id}, name='{user.name}'")
+    return user
+
+@app.delete("/user/{id}", status_code=204)
+async def delete_user(id: int, db: Session = Depends(get_db)):
+    user = db.get(User, id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    db.delete(user)
+    db.commit()
+    logger.info(f"User deleted: ID={id}")
 
 
 @app.get("/drinks")

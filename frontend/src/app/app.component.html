@@ -1,53 +1,5 @@
-<style></style>
-
-<main class="main" style="min-width: 480px;">
-  <div class="content">
-    <h1>{{ componentTitle }}</h1>
-    <div id="camera-div" style="height: 640px; width: 480px; position:relative;text-align: left;">
-      <div>
-      <webcam style="position: absolute;" [trigger]="observableSnapshot" (imageCapture)="processCamSnapshot($event)" [captureImageData]="this.captureImageData"
-        [videoOptions]="videoOptions" [allowCameraSwitch]="allowCameraSwitch"
-        [width]=480 [height]=640 [mirrorImage]="'never'"
-        ></webcam>
-      </div>
-      <div>
-        <canvas id="face-canvas" style="height:100%;width:100%;position: absolute; z-index: 10;"></canvas>
-      </div>
-    </div>
-    <h2> 
-      How much we had today: {{totalQuantity()}} L
-    </h2>
-    <h2> 
-      Active user: {{getActiveUser()}}
-    </h2>
-
-    <ul>
-      <li *ngFor="let drinker of drinkers">
-        <app-item (remove)="remove(drinker)" [item]="drinker" (editing)="editableToggle($event)"></app-item>
-      </li>
-    </ul>
-
-    <label for="addNameInput">Add new</label>
-
-    <input
-      #newName
-      placeholder="name"
-      class="lg-text-input"
-      id="addNameInput" />
-    <!-- 
-    <input
-      #newEmail
-      placeholder="email"
-      class="lg-text-input"
-      id="addEmailInput" /> 
-    <input
-      #newNickname
-      placeholder="nickname"
-      class="lg-text-input"
-      id="addNicknameInput" />
-      -->
-    
-    <button class="btn-primary" (click)="addDrinker(newName.value,'','');newName.value='';">Add</button>
-
-  </div>
-</main>
+<nav class="app-nav">
+  <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">Beer Ranking</a>
+  <a routerLink="/admin" routerLinkActive="active">Admin</a>
+</nav>
+<router-outlet></router-outlet>

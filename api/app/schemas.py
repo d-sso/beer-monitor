@@ -24,6 +24,12 @@ class UserIDSchema(BaseModel):
     id: int
 
 
+class UserUpdateSchema(BaseModel):
+    name: Optional[str] = None
+    email: Optional[str] = None
+    nickname: Optional[str] = None
+
+
 class DrinksSchemaFull(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

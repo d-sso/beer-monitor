@@ -1,0 +1,53 @@
+<main class="admin-main">
+  <h1>Admin — User Management</h1>
+
+  <table class="user-table">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Name</th>
+        <th>Email</th>
+        <th>Nickname</th>
+        <th>Active</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let user of users">
+        <td>{{ user.id }}</td>
+
+        <ng-container *ngIf="!user.editing">
+          <td>{{ user.name }}</td>
+          <td>{{ user.email || '—' }}</td>
+          <td>{{ user.nickname || '—' }}</td>
+        </ng-container>
+
+        <ng-container *ngIf="user.editing">
+          <td><input class="cell-input" [(ngModel)]="user.editName" placeholder="Name" /></td>
+          <td><input class="cell-input" [(ngModel)]="user.editEmail" placeholder="Email" /></td>
+          <td><input class="cell-input" [(ngModel)]="user.editNickname" placeholder="Nickname" /></td>
+        </ng-container>
+
+        <td>
+          <span class="badge" [class.badge-active]="user.active">{{ user.active ? 'Yes' : 'No' }}</span>
+        </td>
+
+        <td class="actions">
+          <ng-container *ngIf="!user.editing">
+            <button class="btn btn-edit" (click)="startEdit(user)">Edit</button>
+            <button class="btn btn-face" (click)="replaceFace(user)">Replace Face</button>
+            <button class="btn btn-delete" (click)="deleteUser(user)">Delete</button>
+          </ng-container>
+          <ng-container *ngIf="user.editing">
+            <button class="btn btn-save" (click)="saveUser(user)">Save</button>
+            <button class="btn btn-cancel" (click)="cancelEdit(user)">Cancel</button>
+          </ng-container>
+        </td>
+      </tr>
+
+      <tr *ngIf="users.length === 0">
+        <td colspan="6" class="empty">No users found.</td>
+      </tr>
+    </tbody>
+  </table>
+</main>

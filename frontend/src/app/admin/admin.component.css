@@ -1,0 +1,82 @@
+.admin-main {
+  max-width: 900px;
+  margin: 2rem auto;
+  padding: 1rem;
+}
+
+h1 {
+  margin-bottom: 1.5rem;
+}
+
+.user-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.user-table th,
+.user-table td {
+  padding: 0.6rem 0.75rem;
+  border: 1px solid #ddd;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.user-table thead th {
+  background: #1a1a2e;
+  color: #fff;
+  font-weight: 600;
+}
+
+.user-table tbody tr:nth-child(even) {
+  background: #f9f9f9;
+}
+
+.cell-input {
+  width: 100%;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid #aaa;
+  border-radius: 3px;
+  font-size: 0.9rem;
+  box-sizing: border-box;
+}
+
+.badge {
+  padding: 0.2rem 0.5rem;
+  border-radius: 3px;
+  font-size: 0.8rem;
+  background: #ddd;
+  color: #555;
+}
+
+.badge-active {
+  background: #d4edda;
+  color: #155724;
+}
+
+.actions {
+  white-space: nowrap;
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.btn {
+  padding: 0.3rem 0.65rem;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.btn-edit   { background: #007bff; color: #fff; }
+.btn-face   { background: #6f42c1; color: #fff; }
+.btn-delete { background: #dc3545; color: #fff; }
+.btn-save   { background: #28a745; color: #fff; }
+.btn-cancel { background: #6c757d; color: #fff; }
+
+.empty {
+  text-align: center;
+  color: #888;
+  padding: 2rem;
+}
