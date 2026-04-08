@@ -49,10 +49,13 @@ def test_on_message(mock_timer):
 # ---------------------------------------------------------------------------
 
 def test_on_connect():
-    """on_connect subscribes to the configured target topic."""
+    """on_connect subscribes to all three configured topics."""
     client = MagicMock()
     MQTTRead.on_connect(client, None, None, None, None)
-    client.subscribe.assert_called_once_with(MQTTRead.TargetTopic)
+    subscribed = [c.args[0] for c in client.subscribe.call_args_list]
+    assert MQTTRead.TargetTopic in subscribed
+    assert MQTTRead.TotalWeightTopic in subscribed
+    assert MQTTRead.TareWeightTopic in subscribed
 
 
 @patch("MQTTRead.Timer")
@@ -118,3 +121,79 @@ def test_register_drink_resets_current_pour_even_on_error(mock_r, mock_post):
     MQTTRead.register_drink(300.0)
 
     mock_r.set.assert_called_with('current_pour', 0)
+
+
+# ---------------------------------------------------------------------------
+# Issue #7: Remaining beer — weight topic subscriptions
+# ---------------------------------------------------------------------------
+
+def test_on_connect_subscribes_to_weight_topics():
+    """on_connect subscribes to pour quantity, total weight, and tare weight topics."""
+    client = MagicMock()
+    MQTTRead.on_connect(client, None, None, None, None)
+
+    subscribed = [call.args[0] for call in client.subscribe.call_args_list]
+    assert MQTTRead.TargetTopic in subscribed
+    assert MQTTRead.TotalWeightTopic in subscribed
+    assert MQTTRead.TareWeightTopic in subscribed
+
+
+@patch("MQTTRead.r")
+def test_on_message_total_weight_updates_state(mock_r):
+    """on_message on TotalWeightTopic updates _weight_state and writes remaining_beer_kg when both known."""
+    MQTTRead._weight_state['total_kg'] = None
+    MQTTRead._weight_state['tare_kg'] = 5.0  # tare already known
+
+    msg = MagicMock()
+    msg.topic = MQTTRead.TotalWeightTopic
+    msg.payload = b"20.0"  # 20 kg total
+
+    MQTTRead.on_message(None, None, msg)
+
+    assert MQTTRead._weight_state['total_kg'] == 20.0
+    mock_r.set.assert_called_with('remaining_beer_kg', 15.0)
+
+
+@patch("MQTTRead.r")
+def test_on_message_tare_weight_updates_state(mock_r):
+    """on_message on TareWeightTopic updates _weight_state and writes remaining_beer_kg when both known."""
+    MQTTRead._weight_state['total_kg'] = 18.0
+    MQTTRead._weight_state['tare_kg'] = None
+
+    msg = MagicMock()
+    msg.topic = MQTTRead.TareWeightTopic
+    msg.payload = b"4.5"
+
+    MQTTRead.on_message(None, None, msg)
+
+    assert MQTTRead._weight_state['tare_kg'] == 4.5
+    mock_r.set.assert_called_with('remaining_beer_kg', pytest.approx(13.5))
+
+
+@patch("MQTTRead.r")
+def test_remaining_beer_clamped_to_zero(mock_r):
+    """remaining_beer_kg is never negative (e.g. if tare > total)."""
+    MQTTRead._weight_state['tare_kg'] = 10.0
+
+    msg = MagicMock()
+    msg.topic = MQTTRead.TotalWeightTopic
+    msg.payload = b"8.0"  # total < tare (sensor noise)
+
+    MQTTRead.on_message(None, None, msg)
+
+    mock_r.set.assert_called_with('remaining_beer_kg', 0.0)
+
+
+@patch("MQTTRead.myTimer")
+def test_weight_topic_does_not_trigger_drink_timer(mock_timer):
+    """Messages on weight topics do not start the drink registration timer."""
+    MQTTRead._weight_state['total_kg'] = None
+
+    with patch("MQTTRead.r"):
+        msg = MagicMock()
+        msg.topic = MQTTRead.TotalWeightTopic
+        msg.payload = b"15.0"
+        MQTTRead.on_message(None, None, msg)
+
+    mock_timer.cancel.assert_not_called()
+    mock_timer.start.assert_not_called()

@@ -63,6 +63,8 @@ services:
       dockerfile: "Dockerfile"
     environment:
       - MQTT_TARGET_TOPIC=${MQTT_TARGET_TOPIC:-beer/quantity}
+      - MQTT_TOTAL_WEIGHT_TOPIC=${MQTT_TOTAL_WEIGHT_TOPIC:-beer/total_weight}
+      - MQTT_TARE_WEIGHT_TOPIC=${MQTT_TARE_WEIGHT_TOPIC:-beer/tare_weight}
       - MQTT_USERNAME=${MQTT_USERNAME}
       - MQTT_PASSWORD=${MQTT_PASSWORD}
       - API_URL=https://api:443/drinks

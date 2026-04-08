@@ -47,6 +47,44 @@ ul li {
   list-style: none;
 }
 
+.remaining-beer {
+  margin: 1rem 0;
+  text-align: left;
+}
+
+.keg-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.4rem;
+}
+
+.keg-text {
+  flex: 1;
+}
+
+.keg-name {
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.keg-remaining {
+  font-size: 0.85rem;
+  color: #555;
+}
+
+.keg-label {
+  height: 56px;
+  width: auto;
+  border-radius: 4px;
+  object-fit: contain;
+  margin-left: 0.75rem;
+}
+
+.keg-fill {
+  background: linear-gradient(90deg, #f5a623, #43a047) !important;
+}
+
 .pour-gauge {
   margin: 1rem 0;
   text-align: left;

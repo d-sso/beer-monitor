@@ -19,6 +19,28 @@
       Active user: {{getActiveUser()}}
     </h2>
 
+    <div class="remaining-beer" *ngIf="activeKeg">
+      <div class="keg-header">
+        <div class="keg-text">
+          <div class="keg-name">{{ activeKeg.name }}</div>
+          <div class="keg-remaining">
+            {{ remainingBeerL !== null ? (remainingBeerL | number:'1.1-1') : '—' }} L
+            / {{ activeKeg.keg_size }} L
+          </div>
+        </div>
+        <img *ngIf="activeKeg.image_url" [src]="activeKeg.image_url"
+             class="keg-label" alt="Beer label" />
+      </div>
+      <div class="gauge-track">
+        <div class="gauge-fill keg-fill" [style.width.%]="remainingPercent()"></div>
+      </div>
+      <div class="gauge-scale">
+        <span>0</span>
+        <span>{{ (activeKeg.keg_size / 2) | number:'1.0-0' }} L</span>
+        <span>{{ activeKeg.keg_size }} L</span>
+      </div>
+    </div>
+
     <div class="pour-gauge">
       <div class="gauge-label">Pouring: {{ currentPour | number:'1.0-0' }} ml</div>
       <div class="gauge-track">

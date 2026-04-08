@@ -20,6 +20,12 @@ interface LatestDrink {
   timestamp: string;
 }
 
+interface KegInfo {
+  keg_size: number;
+  name: string;
+  image_url: string | null;
+}
+
 @Component({
   selector: 'app-home',
   standalone: true,
@@ -40,6 +46,8 @@ export class HomeComponent {
   latestDrinks: LatestDrink[] = [];
   currentPour: number = 0;
   readonly POUR_MAX_ML = 600;
+  remainingBeerL: number | null = null;
+  activeKeg: KegInfo | null = null;
 
   wsSubject = webSocket(
     {
@@ -85,6 +93,10 @@ export class HomeComponent {
           this.latestDrinks = msg['latest_drinks'] as LatestDrink[];
         if(typeof msg === "object" && msg && "current_pour" in msg)
           this.currentPour = msg['current_pour'] as number;
+        if(typeof msg === "object" && msg && "remaining_beer_l" in msg)
+          this.remainingBeerL = msg['remaining_beer_l'] as number | null;
+        if(typeof msg === "object" && msg && "active_keg" in msg)
+          this.activeKeg = msg['active_keg'] as KegInfo | null;
         if(!this.webCamArea){
           this.webCamArea = document.getElementById("face-canvas") as HTMLCanvasElement;
           this.webCamArea.height = this.webCamArea.clientHeight;
@@ -202,6 +214,11 @@ export class HomeComponent {
 
   pourPercent(): number {
     return Math.min(100, (this.currentPour / this.POUR_MAX_ML) * 100);
+  }
+
+  remainingPercent(): number {
+    if (this.remainingBeerL === null || !this.activeKeg) return 0;
+    return Math.min(100, (this.remainingBeerL / this.activeKeg.keg_size) * 100);
   }
 
   get drinkers() {

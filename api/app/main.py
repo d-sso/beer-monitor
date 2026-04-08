@@ -47,6 +47,11 @@ class LatestDrink(BaseModel):
     quantity: float
     timestamp: str
 
+class KegInfo(BaseModel):
+    keg_size: float
+    name: str
+    image_url: Optional[str] = None
+
 class Faces(BaseModel):
     """ This is a pydantic model to define the structure of the streaming data
     that we will be sending the the cv2 Classifier to make predictions
@@ -57,6 +62,8 @@ class Faces(BaseModel):
     app_state: DetectApp
     latest_drinks: List[LatestDrink] = []
     current_pour: float = 0.0
+    remaining_beer_l: Optional[float] = None
+    active_keg: Optional[KegInfo] = None
 
 ### END todo
 Base.metadata.create_all(bind=engine)
@@ -376,6 +383,10 @@ async def detect(websocket: WebSocket, async_state: any):
     This function retrieves the latest detection results from Redis
     and sends them to the frontend
     """
+    keg_refresh_ticks = 0
+    cached_keg_info: Optional[KegInfo] = None
+    cached_remaining_l: Optional[float] = None
+
     while True:
         try:
             # Sync local state from Redis so worker-driven transitions
@@ -400,6 +411,33 @@ async def detect(websocket: WebSocket, async_state: any):
                 except (ValueError, TypeError):
                     pass
 
+            # Refresh keg info and remaining beer every ~5 seconds (50 ticks × 100ms)
+            keg_refresh_ticks += 1
+            if keg_refresh_ticks >= 50:
+                keg_refresh_ticks = 0
+                remaining_raw = r.get('remaining_beer_kg')
+                db = SessionLocal()
+                try:
+                    active_keg = db.query(Keg).filter(Keg.active == True).first()
+                    if active_keg:
+                        density = active_keg.density if active_keg.density else 1.0
+                        cached_keg_info = KegInfo(
+                            keg_size=active_keg.keg_size,
+                            name=active_keg.name,
+                            image_url=active_keg.image_url,
+                        )
+                        if remaining_raw is not None:
+                            try:
+                                remaining_kg = float(remaining_raw)
+                                cached_remaining_l = remaining_kg / density
+                            except (ValueError, TypeError):
+                                cached_remaining_l = None
+                    else:
+                        cached_keg_info = None
+                        cached_remaining_l = None
+                finally:
+                    db.close()
+
             last_results = r.get('last_face_locations')
             if last_results:
                 results = json.loads(last_results)
@@ -409,6 +447,8 @@ async def detect(websocket: WebSocket, async_state: any):
                     detected_face=results.get('user_ids', []),
                     latest_drinks=latest_drinks,
                     current_pour=current_pour,
+                    remaining_beer_l=cached_remaining_l,
+                    active_keg=cached_keg_info,
                 )
                 await websocket.send_text(faces_output.model_dump_json())
 
