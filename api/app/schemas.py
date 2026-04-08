@@ -61,6 +61,31 @@ class DrinkUpdateSchema(BaseModel):
     quantity: Optional[float] = None
 
 
+class KegSchema(BaseModel):
+    name: str
+    keg_size: float
+    density: Optional[float] = None
+    image_url: Optional[str] = None
+
+
+class KegUpdateSchema(BaseModel):
+    name: Optional[str] = None
+    keg_size: Optional[float] = None
+    density: Optional[float] = None
+    image_url: Optional[str] = None
+
+
+class KegResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    keg_size: float
+    density: Optional[float] = None
+    active: bool = False
+    image_url: Optional[str] = None
+
+
 class UserResponse(BaseModel):
     """Single user without drinks list — used for endpoints that return one user."""
     model_config = ConfigDict(from_attributes=True)

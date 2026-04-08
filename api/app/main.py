@@ -10,9 +10,9 @@ import numpy as np
 from fastapi import FastAPI, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from app.models import Base, User, Drinks
+from app.models import Base, User, Drinks, Keg
 from sqlalchemy.orm import selectinload
-from app.schemas import UserSchema, DrinksSchema, DrinkQuantitySchema, UserResponse, UserWithDrinks, UserUpdateSchema, PaginatedDrinks, DrinkWithUser, DrinkUpdateSchema
+from app.schemas import UserSchema, DrinksSchema, DrinkQuantitySchema, UserResponse, UserWithDrinks, UserUpdateSchema, PaginatedDrinks, DrinkWithUser, DrinkUpdateSchema, KegSchema, KegUpdateSchema, KegResponse
 from app.database import engine, SessionLocal
 from pydantic import BaseModel
 import ssl
@@ -252,6 +252,68 @@ async def add_drink_to_active(request:DrinkQuantitySchema, db: Session = Depends
     logger.info(f"Drink added: {request.quantity:.1f}ml for '{currentActive.name}' (user_id={currentActive.id}, drink_id={drink.id})")
     _write_latest_drinks(db)
     return drink
+
+
+### Keg management endpoints
+
+@app.get("/kegs", response_model=List[KegResponse])
+async def get_kegs(db: Session = Depends(get_db)):
+    return db.query(Keg).all()
+
+@app.post("/keg", response_model=KegResponse)
+async def create_keg(request: KegSchema, db: Session = Depends(get_db)):
+    keg = Keg(
+        name=request.name,
+        keg_size=request.keg_size,
+        density=request.density,
+        image_url=request.image_url,
+        active=False,
+    )
+    db.add(keg)
+    db.commit()
+    db.refresh(keg)
+    logger.info(f"Keg created: '{keg.name}' {keg.keg_size}L (ID={keg.id})")
+    return keg
+
+@app.patch("/keg/{id}", response_model=KegResponse)
+async def update_keg(id: int, request: KegUpdateSchema, db: Session = Depends(get_db)):
+    keg = db.get(Keg, id)
+    if not keg:
+        raise HTTPException(status_code=404, detail="Keg not found")
+    if request.name is not None:
+        keg.name = request.name
+    if request.keg_size is not None:
+        keg.keg_size = request.keg_size
+    if request.density is not None:
+        keg.density = request.density
+    if request.image_url is not None:
+        keg.image_url = request.image_url
+    db.commit()
+    db.refresh(keg)
+    logger.info(f"Keg updated: ID={id}")
+    return keg
+
+@app.delete("/keg/{id}", status_code=204)
+async def delete_keg(id: int, db: Session = Depends(get_db)):
+    keg = db.get(Keg, id)
+    if not keg:
+        raise HTTPException(status_code=404, detail="Keg not found")
+    db.delete(keg)
+    db.commit()
+    logger.info(f"Keg deleted: ID={id}")
+
+@app.post("/keg/{id}/activate", response_model=KegResponse)
+async def activate_keg(id: int, db: Session = Depends(get_db)):
+    keg = db.get(Keg, id)
+    if not keg:
+        raise HTTPException(status_code=404, detail="Keg not found")
+    # Deactivate all kegs then activate the requested one
+    db.query(Keg).update({Keg.active: False})
+    keg.active = True
+    db.commit()
+    db.refresh(keg)
+    logger.info(f"Keg activated: '{keg.name}' (ID={id})")
+    return keg
 
 
 import redis

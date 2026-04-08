@@ -62,4 +62,24 @@ export class DrinksService {
   updateDrink(id: number, data: { user_id?: number | null; quantity?: number }): Observable<any> {
     return this.http.patch(`${this.base_url}/drink/${id}`, data);
   }
+
+  getKegs(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.base_url}/kegs`);
+  }
+
+  createKeg(data: { name: string; keg_size: number; density?: number | null; image_url?: string | null }): Observable<any> {
+    return this.http.post(`${this.base_url}/keg`, data);
+  }
+
+  updateKeg(id: number, data: { name?: string; keg_size?: number; density?: number | null; image_url?: string | null }): Observable<any> {
+    return this.http.patch(`${this.base_url}/keg/${id}`, data);
+  }
+
+  deleteKeg(id: number): Observable<any> {
+    return this.http.delete(`${this.base_url}/keg/${id}`);
+  }
+
+  activateKeg(id: number): Observable<any> {
+    return this.http.post(`${this.base_url}/keg/${id}/activate`, null);
+  }
 }

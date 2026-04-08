@@ -348,3 +348,85 @@ def test_delete_user_drinks_preserved(client):
 
     drinks = client.get("/drinks").json()["items"]
     assert any(d["user_id"] == user["id"] for d in drinks)
+
+
+# ---------------------------------------------------------------------------
+# Issue #6: Keg management CRUD
+# ---------------------------------------------------------------------------
+
+def test_create_keg(client):
+    """POST /keg creates a new keg record."""
+    response = client.post("/keg", json={"name": "Paulaner Weizen", "keg_size": 30.0, "density": 1.01})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["name"] == "Paulaner Weizen"
+    assert data["keg_size"] == 30.0
+    assert data["density"] == 1.01
+    assert data["active"] == False
+
+
+def test_get_kegs(client):
+    """GET /kegs returns all kegs."""
+    client.post("/keg", json={"name": "Keg A", "keg_size": 19.0})
+    client.post("/keg", json={"name": "Keg B", "keg_size": 50.0})
+    response = client.get("/kegs")
+    assert response.status_code == 200
+    assert len(response.json()) == 2
+
+
+def test_update_keg(client):
+    """PATCH /keg/{id} updates keg fields."""
+    keg = client.post("/keg", json={"name": "OldName", "keg_size": 19.0}).json()
+    response = client.patch(f"/keg/{keg['id']}", json={"name": "NewName", "keg_size": 30.0})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["name"] == "NewName"
+    assert data["keg_size"] == 30.0
+
+
+def test_update_keg_not_found(client):
+    """PATCH /keg/{id} returns 404 for a non-existent keg."""
+    response = client.patch("/keg/99999", json={"name": "Ghost"})
+    assert response.status_code == 404
+
+
+def test_delete_keg(client):
+    """DELETE /keg/{id} removes the keg."""
+    keg = client.post("/keg", json={"name": "ToDelete", "keg_size": 19.0}).json()
+    response = client.delete(f"/keg/{keg['id']}")
+    assert response.status_code == 204
+    assert len(client.get("/kegs").json()) == 0
+
+
+def test_delete_keg_not_found(client):
+    """DELETE /keg/{id} returns 404 for a non-existent keg."""
+    response = client.delete("/keg/99999")
+    assert response.status_code == 404
+
+
+def test_activate_keg(client):
+    """POST /keg/{id}/activate sets the keg as active and deactivates others."""
+    keg_a = client.post("/keg", json={"name": "Keg A", "keg_size": 19.0}).json()
+    keg_b = client.post("/keg", json={"name": "Keg B", "keg_size": 30.0}).json()
+
+    client.post(f"/keg/{keg_a['id']}/activate")
+    client.post(f"/keg/{keg_b['id']}/activate")
+
+    kegs = client.get("/kegs").json()
+    active = [k for k in kegs if k["active"]]
+    assert len(active) == 1
+    assert active[0]["id"] == keg_b["id"]
+
+
+def test_activate_keg_not_found(client):
+    """POST /keg/{id}/activate returns 404 for a non-existent keg."""
+    response = client.post("/keg/99999/activate")
+    assert response.status_code == 404
+
+
+def test_keg_image_url(client):
+    """Keg image_url is stored and returned correctly."""
+    keg = client.post("/keg", json={"name": "Erdinger", "keg_size": 30.0, "image_url": "https://example.com/label.png"}).json()
+    assert keg["image_url"] == "https://example.com/label.png"
+    updated = client.patch(f"/keg/{keg['id']}", json={"image_url": "https://example.com/new.png"}).json()
+    assert updated["image_url"] == "https://example.com/new.png"

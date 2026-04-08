@@ -25,3 +25,14 @@ class Drinks(Base):
     user: Mapped[Optional["User"]] = relationship(back_populates="drinks")
     timestamp = Column(DateTime, default=datetime.utcnow)
     quantity = Column(Double)
+
+
+class Keg(Base):
+    __tablename__ = "kegs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name = Column(String, nullable=False)
+    keg_size = Column(Double, nullable=False)         # litres
+    density = Column(Double, nullable=True)           # kg/L — defaults to 1.0 if NULL
+    active = Column(Boolean, default=False)
+    image_url = Column(String, nullable=True)

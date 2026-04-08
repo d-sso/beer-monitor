@@ -1,15 +1,12 @@
 <main class="admin-main">
+
+  <!-- ── Users ─────────────────────────────────────────────────────────── -->
   <h1>Admin — User Management</h1>
 
-  <table class="user-table">
+  <table class="data-table">
     <thead>
       <tr>
-        <th>ID</th>
-        <th>Name</th>
-        <th>Email</th>
-        <th>Nickname</th>
-        <th>Active</th>
-        <th>Actions</th>
+        <th>ID</th><th>Name</th><th>Email</th><th>Nickname</th><th>Active</th><th>Actions</th>
       </tr>
     </thead>
     <tbody>
@@ -21,7 +18,6 @@
           <td>{{ user.email || '—' }}</td>
           <td>{{ user.nickname || '—' }}</td>
         </ng-container>
-
         <ng-container *ngIf="user.editing">
           <td><input class="cell-input" [(ngModel)]="user.editName" placeholder="Name" /></td>
           <td><input class="cell-input" [(ngModel)]="user.editEmail" placeholder="Email" /></td>
@@ -31,23 +27,86 @@
         <td>
           <span class="badge" [class.badge-active]="user.active">{{ user.active ? 'Yes' : 'No' }}</span>
         </td>
-
         <td class="actions">
           <ng-container *ngIf="!user.editing">
-            <button class="btn btn-edit" (click)="startEdit(user)">Edit</button>
+            <button class="btn btn-edit" (click)="startEditUser(user)">Edit</button>
             <button class="btn btn-face" (click)="replaceFace(user)">Replace Face</button>
             <button class="btn btn-delete" (click)="deleteUser(user)">Delete</button>
           </ng-container>
           <ng-container *ngIf="user.editing">
             <button class="btn btn-save" (click)="saveUser(user)">Save</button>
-            <button class="btn btn-cancel" (click)="cancelEdit(user)">Cancel</button>
+            <button class="btn btn-cancel" (click)="cancelEditUser(user)">Cancel</button>
           </ng-container>
         </td>
       </tr>
-
       <tr *ngIf="users.length === 0">
         <td colspan="6" class="empty">No users found.</td>
       </tr>
     </tbody>
   </table>
+
+  <!-- ── Kegs ──────────────────────────────────────────────────────────── -->
+  <h2 class="section-title">Keg Management</h2>
+
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>ID</th><th>Name</th><th>Size (L)</th><th>Density (kg/L)</th><th>Image URL</th><th>Active</th><th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let keg of kegs">
+        <td>{{ keg.id }}</td>
+
+        <ng-container *ngIf="!keg.editing">
+          <td>{{ keg.name }}</td>
+          <td>{{ keg.keg_size }}</td>
+          <td>{{ keg.density ?? '1.0 (default)' }}</td>
+          <td class="url-cell">
+            <span *ngIf="keg.image_url">
+              <a [href]="keg.image_url" target="_blank" rel="noopener">preview</a>
+            </span>
+            <span *ngIf="!keg.image_url">—</span>
+          </td>
+        </ng-container>
+        <ng-container *ngIf="keg.editing">
+          <td><input class="cell-input" [(ngModel)]="keg.editName" placeholder="Name" /></td>
+          <td><input class="cell-input num-input" type="number" [(ngModel)]="keg.editKegSize" /></td>
+          <td><input class="cell-input num-input" type="number" step="0.01" [(ngModel)]="keg.editDensity" placeholder="e.g. 1.01" /></td>
+          <td><input class="cell-input" [(ngModel)]="keg.editImageUrl" placeholder="https://..." /></td>
+        </ng-container>
+
+        <td>
+          <span class="badge" [class.badge-active]="keg.active">{{ keg.active ? 'Active' : 'No' }}</span>
+        </td>
+        <td class="actions">
+          <ng-container *ngIf="!keg.editing">
+            <button class="btn btn-edit" (click)="startEditKeg(keg)">Edit</button>
+            <button class="btn btn-activate" [disabled]="keg.active" (click)="activateKeg(keg)">Activate</button>
+            <button class="btn btn-delete" (click)="deleteKeg(keg)">Delete</button>
+          </ng-container>
+          <ng-container *ngIf="keg.editing">
+            <button class="btn btn-save" (click)="saveKeg(keg)">Save</button>
+            <button class="btn btn-cancel" (click)="cancelEditKeg(keg)">Cancel</button>
+          </ng-container>
+        </td>
+      </tr>
+      <tr *ngIf="kegs.length === 0">
+        <td colspan="7" class="empty">No kegs configured.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- Add new keg form -->
+  <div class="add-keg-form">
+    <h3>Add new keg</h3>
+    <div class="form-row">
+      <input class="cell-input" [(ngModel)]="newKeg.name" placeholder="Name (e.g. Paulaner Weizen)" />
+      <input class="cell-input num-input" type="number" [(ngModel)]="newKeg.keg_size" placeholder="Size (L)" />
+      <input class="cell-input num-input" type="number" step="0.01" [(ngModel)]="newKeg.density" placeholder="Density kg/L" />
+      <input class="cell-input" [(ngModel)]="newKeg.image_url" placeholder="Image URL (optional)" />
+      <button class="btn btn-save" (click)="addKeg()" [disabled]="!newKeg.name.trim()">Add Keg</button>
+    </div>
+  </div>
+
 </main>
