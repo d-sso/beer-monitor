@@ -109,6 +109,7 @@ async def add_user(request:UserSchema, db: Session = Depends(get_db)):
     if user:
         asyncState.app_mode = AppModes.DETECT
         logger.info(f"User already exists: '{request.name}' (ID: {user.id})")
+        _write_app_state()
         return user
 
     user = User(name = request.name, email = request.email, nickname = request.nickname)
@@ -119,6 +120,8 @@ async def add_user(request:UserSchema, db: Session = Depends(get_db)):
     asyncState.app_mode = AppModes.CAPTURE
     asyncState.user_id = user.id
     asyncState.saved_images = 0
+    _write_app_state()
+    logger.info(f"Switched to CAPTURE mode for user_id={user.id}, capturing {asyncState.n_images} images")
 
     return user
 
@@ -192,6 +195,13 @@ import json
 redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
 r = redis.from_url(redis_url)
 
+def _write_app_state():
+    """Publish asyncState to Redis so the worker can read the current mode."""
+    try:
+        r.set('app_state', asyncState.model_dump_json())
+    except Exception as e:
+        logger.warning(f"Could not write app state to Redis: {e}")
+
 ### SECTION for handling the web sockets and images
 async def receive(websocket: WebSocket):
     """
@@ -224,7 +234,15 @@ async def detect(websocket: WebSocket, async_state: any):
     """
     while True:
         try:
-            # Periodically check Redis for the latest face locations/ids
+            # Sync local state from Redis so worker-driven transitions
+            # (e.g. CAPTURE -> DETECT after N images) reach the frontend
+            state_data = r.get('app_state')
+            if state_data:
+                state = json.loads(state_data)
+                async_state.app_mode = AppModes(state['app_mode'])
+                async_state.saved_images = state['saved_images']
+                async_state.user_id = state['user_id']
+
             last_results = r.get('last_face_locations')
             if last_results:
                 results = json.loads(last_results)
@@ -234,7 +252,7 @@ async def detect(websocket: WebSocket, async_state: any):
                     detected_face=results.get('user_ids', [])
                 )
                 await websocket.send_text(faces_output.model_dump_json())
-            
+
             # Small delay to not overwhelm the websocket with redundant data
             await asyncio.sleep(0.1)
         except Exception as e:
@@ -270,6 +288,7 @@ async def record_face(id):
     asyncState.app_mode = AppModes.CAPTURE
     asyncState.saved_images = 0
     asyncState.user_id = id
+    _write_app_state()
     return asyncState
 
 @app.post("/detectFace")
@@ -280,6 +299,7 @@ async def detect_face():
     asyncState.app_mode = AppModes.DETECT
     asyncState.saved_images = 0
     asyncState.user_id = 0
+    _write_app_state()
     return asyncState
 
 static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
